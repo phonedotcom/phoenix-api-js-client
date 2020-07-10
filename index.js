@@ -4,17 +4,17 @@ class PhoenixApiClient {
 
   user = null;
   extension_id = null;
-  session_name;
+  options = {
+    'session_name': 'phoenix-api-js-client-session'
+  };
 
-  constructor(user, session_name) {
-    this.session_name = USER_STORAGE_KEY + '_' + session_name;
-    if (!user) {
-      user = sessionStorage.getItem(this.session_name);
-      if (user) {
-        user = JSON.parse(user)
-      }
+  constructor(options = {}) {
+    Object.assign(this.options, options);
+    const user = sessionStorage.getItem(this.options.session_name);
+    if (user) {
+      user = JSON.parse(user)
     }
-    user && this.set_user(user)
+    user && this.set_user(user);
   }
 
   throttleMessage(seconds) {
