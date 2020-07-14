@@ -1,6 +1,7 @@
 const USER_STORAGE_KEY = "mini-user";
 const axios = require("axios");
 
+/** Class representing a PhoenixApi client. */
 class PhoenixApiClient {
   user = null;
   extension_id = null;
@@ -10,7 +11,10 @@ class PhoenixApiClient {
     handle_server_error: 3,
     session_name: "phoenix-api-js-client-session",
   };
-
+  /**
+   * Create a PhoenixApiClient.
+   * @param {object} options - objects that updates class options
+   */
   constructor(options = {}) {
     Object.assign(this.options, options);
     let user = sessionStorage.getItem(this.options.session_name);
@@ -19,10 +23,21 @@ class PhoenixApiClient {
     user && this.set_user(user);
   }
 
+  /**
+    * Generates common 429 error message.
+    * @param {number} seconds - The number of seconds user has to wait for the new request.
+    * @return {string} formated message.
+  */
   throttleMessage(seconds) {
     return `Too much requests. It will retry after ${seconds}s`;
   }
 
+  /**
+    * Handles rate limit if enabled in the constructor options.
+    * @param {object} err - The error object returned from he API
+    * @param {function} callback - the method that will be executed right after rate limit ends
+    * @return {Promise} result of resent request
+  */
   handle_rate_limit(err, callback) {
     const seconds = err.data["@error"]["@rateLimit"]["Retry-After"] || 1;
     console.log(this.throttleMessage(seconds));
@@ -35,6 +50,12 @@ class PhoenixApiClient {
     });
   }
 
+  /**
+    * Handles internal server errors if enabled in the constructor options.
+    * @param {object} err - The error object returned from he API
+    * @param {function} callback - the method that will be executed after 500ms
+    * @return {Promise} result of resent request
+  */
   handle_internal_server_error(err, callback) {
     console.log(err);
     console.log("Internal server error. Retrying...");
@@ -47,6 +68,10 @@ class PhoenixApiClient {
     });
   }
 
+  /**
+    * Loads the user by the Bearer token, sets session expiration time
+    * @param {string} token - Bearer token
+  */
   async load_user(token, attempt = 1) {
     try {
       const headers = this.phoenix_auth_headers(token);
@@ -90,6 +115,9 @@ class PhoenixApiClient {
     }
   }
 
+  /**
+    * Signs out the authenticated user
+  */
   sign_out() {
     sessionStorage.removeItem(this.options.session_name);
     this.user = null;
@@ -102,11 +130,18 @@ class PhoenixApiClient {
     };
   }
 
+  /**
+    * Signs out the user with expired session
+  */
   handle_expired_session() {
     alert("You session has expired. Please sign in again.");
     this.sign_out();
   }
 
+  /**
+    * Sets the user for the session, sets session expiration time
+    * @param {object} user - object with user id, token and expiration time
+  */
   set_user(user) {
     this.user = user;
     this.set_extension(
@@ -126,14 +161,29 @@ class PhoenixApiClient {
     }
   }
 
+  /**
+    * Sets extension id
+    * @param {number} extension_id - Extension Id that will be used for calls
+  */
   set_extension(extension_id) {
     this.extension_id = extension_id;
   }
 
+  /**
+    * Generates sign in page link for the user
+    * @return {string} A _get_auth_link method result.
+  */
   get_auth_link() {
     return this._get_auth_link("", true);
   }
 
+  /**
+    * Generates sign in page link for the user.
+    * @param {string} redirect_path - path to the specific redirect page
+    * @param {boolean} is_token - specifies is response_type in the uri should be 
+    * token (if true) or code  (if false)
+    * @return {string} sign in uri
+  */
   _get_auth_link(redirect_path, is_token) {
     const state = Math.floor(Math.random() * 10000000);
     const redirect = `${document.location.protocol}//${document.location.host}${redirect_path}`;
@@ -146,6 +196,13 @@ class PhoenixApiClient {
     )}&state=${state}`;
   }
 
+  /**
+    * Generates base url for the api calls
+    * @param {string} uri - path to specific resource
+    * @param {boolean} global - if false - looks on the user account level, 
+    * true - looks generaly 
+    * @return {string} generated url
+  */
   _phoenix_url(uri, global) {
     let url = "https://api.cit-phone.com/v4";
     if (!global) {
@@ -154,6 +211,11 @@ class PhoenixApiClient {
     return `${url}${uri}`;
   }
 
+  /**
+    * Generates headers for API calls.
+    * @param {string} token - nullable, session user token or Bearer token
+    * @return {object} headers object
+  */
   phoenix_auth_headers(token) {
     return (this.user && this.user["token"]) || token
       ? {
@@ -163,6 +225,11 @@ class PhoenixApiClient {
       : {};
   }
 
+  /**
+    * Gets all items specified in the uri.
+    * @param {string} uri - target resource uri
+    * @return {object} object containing all items
+  */
   async get_list_all(uri) {
     let all = [];
     let res;
@@ -182,6 +249,15 @@ class PhoenixApiClient {
     };
   }
 
+  /**
+    * Gets items specified in the uri.
+    * @param {string} uri - target resource uri
+    * @param {number} limit - API limit
+    * @param {number} offset - API offset
+    * @param {boolean} global - if false - looks on the user account level, 
+    * true - looks generaly 
+    * @return {object} object containing items
+  */
   async get_list(uri, limit, offset, global, attempt = 1) {
     try {
       if (limit) {
@@ -220,6 +296,11 @@ class PhoenixApiClient {
     }
   }
 
+  /**
+    * Gets the item specified in the uri
+    * @param {string} uri - target resource uri
+    * @return {object} response object.
+  */
   async get_item(uri, attempt = 1) {
     try {
       const item = await axios.get(this._phoenix_url(uri), {
@@ -248,6 +329,11 @@ class PhoenixApiClient {
     }
   }
 
+  /**
+    * Deletes the item specified in the uri
+    * @param {string} uri - target resource uri
+    * @return {object} response object.
+  */
   async delete_item(uri, attempt = 1) {
     try {
       const item = await axios.delete(this._phoenix_url(uri), {
@@ -276,6 +362,11 @@ class PhoenixApiClient {
     }
   }
 
+  /**
+    * Downloads the item specified in the uri
+    * @param {string} uri - target resource uri
+    * @return {object} response object.
+  */
   async download_item(uri, attempt = 1) {
     try {
       const item = await axios.get(this._phoenix_url(uri), {
@@ -306,6 +397,12 @@ class PhoenixApiClient {
     }
   }
 
+  /**
+    * Sends PUT request to update the item specified in the uri
+    * @param {string} uri - target resource uri
+    * @param {object} data - data that should be updated
+    * @return {object} response object.
+  */
   async replace_item(uri, data, attempt = 1) {
     try {
       const item = await axios.put(this._phoenix_url(uri), data, {
@@ -334,6 +431,12 @@ class PhoenixApiClient {
     }
   }
 
+  /**
+    * Sends PATCH request to update the item specified in the uri
+    * @param {string} uri - target resource uri
+    * @param {object} data - data that should be updated
+    * @return {object} response object.
+  */
   async patch_item(uri, data, attempt = 1) {
     try {
       const item = await axios.patch(this._phoenix_url(uri), data, {
@@ -362,6 +465,12 @@ class PhoenixApiClient {
     }
   }
 
+  /**
+    * Created the resource specified in the uri
+    * @param {string} uri - target resource uri
+    * @param {object} data - data that should be created
+    * @return {object} response object.
+  */
   async create_item(uri, data, attempt = 1) {
     try {
       const item = await axios.post(this._phoenix_url(uri), data, {
