@@ -228,7 +228,7 @@ class PhoenixApiClient {
   /**
     * Gets all items specified in the uri.
     * @param {string} uri - target resource uri
-    * @return {object} object containing all items
+    * @return {object} object containing all requested items
   */
   async get_list_all(uri) {
     let all = [];
@@ -256,7 +256,7 @@ class PhoenixApiClient {
     * @param {number} offset - API offset
     * @param {boolean} global - if false - looks on the user account level, 
     * true - looks generaly 
-    * @return {object} object containing items
+    * @return {object} object containing requested items
   */
   async get_list(uri, limit, offset, global, attempt = 1) {
     try {
