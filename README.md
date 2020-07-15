@@ -23,6 +23,7 @@ options = {
     client_id: null,
     handle_rate_limit: true,
     handle_server_error: 3,
+    scope: ["account-owner"],
     session_name: "phoenix-api-js-client-session",
   };
 ```
@@ -32,7 +33,8 @@ options = {
 
 - ***handle_rate_limit***: boolean, default: true; If you send too much requests in certain period of time, it will throw 429 error. Enabling this option, this will wait for the response specified time and it will resend the same request. Logs the message in the console. Disabling this option, it immediately throws the 429 error.
 - ***handle_server_error***: false or unsigned integer, default: 3; Specifies the number of retries if the server responds with 500+ error (500, 501, 502 etc). Logs error in the console.  Disabling this option, it immediately throws the error.
-- ***session_name***: string, default: "phoenix-api-js-client-session"; session name for authenticated users.
+- ***scope***: array, default: ["account-owner"]; session name for authenticated users.
+- ***session_name***: string, default: "phoenix-api-js-client-session"; scopes for users, possible values: account-owner, extension-user, call-logs, billing-api, oauth-management.
 
 After creating this class object, it will give you access to its method. First of them you will probably use are:
 

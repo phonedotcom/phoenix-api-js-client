@@ -9,6 +9,7 @@ class PhoenixApiClient {
     client_id: null,
     handle_rate_limit: true,
     handle_server_error: 3,
+    scope: ["account-owner"],
     session_name: "phoenix-api-js-client-session",
   };
   /**
@@ -198,7 +199,7 @@ class PhoenixApiClient {
       this.options.client_id
     }&response_type=${
       is_token ? "token" : "code"
-    }&scope=account-owner&redirect_uri=${encodeURIComponent(
+    }&scope=${encodeURIComponent(this.options.scope.join(' '))}&redirect_uri=${encodeURIComponent(
       redirect
     )}&state=${state}`;
   }
