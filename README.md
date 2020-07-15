@@ -1,7 +1,8 @@
-# Phoenix Api JS Client.
+
+# JavaScript Client for api.phone.com.
 
 ## Description
-Phoenix Api JS Client is a very simple npm package developed by [Phone.com](https://www.phone.com/) that simplifies usage of their API.
+This package is supposed to simplify usage of [Phone.com](https://www.phone.com/) API in front-end applications.
 Api documentation can be found [here](https://apidocs.phone.com/).
 
 ## Instalation
@@ -51,5 +52,4 @@ You are now ready to use all of other methods.
 | patch_item | uri: string, required; data: object, required | Sends PATCH request to update the item specified in the uri
 | replace_item | uri: string, required; data: object, required | Sends PUT request to update the item specified in the uri
 | download_item | uri: string, required | Downloads the item specified in the uri. 
-| delete_item | uri: string, required | Deletes the item specified in the uri.
-|  |  |  
+| delete_item | uri: string, required | Deletes the item specified in the uri. 

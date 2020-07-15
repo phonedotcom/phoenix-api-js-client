@@ -185,7 +185,14 @@ class PhoenixApiClient {
     * @return {string} sign in uri
   */
   _get_auth_link(redirect_path, is_token) {
-    const state = Math.floor(Math.random() * 10000000);
+    let state;
+    const state_storage_key = `${this.options.session_name}_state`;
+    if(localStorage.getItem(state_storage_key)){
+      state = localStorage.getItem(state_storage_key);
+    }else{
+      state = Math.floor(Math.random() * 10000000).toString();
+      localStorage.setItem(state_storage_key, state);
+    }
     const redirect = `${document.location.protocol}//${document.location.host}${redirect_path}`;
     return `https://oauth.phone.com/?client_id=${
       this.options.client_id
