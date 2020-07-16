@@ -1,10 +1,10 @@
-const USER_STORAGE_KEY = "mini-user";
 const axios = require("axios");
 
 /** Class representing a PhoenixApi client. */
 class PhoenixApiClient {
+
   user = null;
-  extension_id = null;
+
   options = {
     client_id: null,
     handle_rate_limit: true,
@@ -12,36 +12,28 @@ class PhoenixApiClient {
     scope: ["account-owner"],
     session_name: "phoenix-api-js-client-session",
   };
+
   /**
    * Create a PhoenixApiClient.
    * @param {object} options - objects that updates class options
    */
   constructor(options = {}) {
     Object.assign(this.options, options);
+    // TODO Add function which will check window's hash, and load token from where if provided. It is also where you should check "state".
     let user = sessionStorage.getItem(this.options.session_name);
     if (user) user = JSON.parse(user);
-
     user && this.set_user(user);
   }
 
   /**
-    * Generates common 429 error message.
-    * @param {number} seconds - The number of seconds user has to wait for the new request.
-    * @return {string} formated message.
-  */
-  throttleMessage(seconds) {
-    return `Too much requests. It will retry after ${seconds}s`;
-  }
-
-  /**
-    * Handles rate limit if enabled in the constructor options.
-    * @param {object} err - The error object returned from he API
-    * @param {function} callback - the method that will be executed right after rate limit ends
-    * @return {Promise} result of resent request
-  */
+   * Handles rate limit if enabled in the constructor options.
+   * @param {object} err - The error object returned from he API
+   * @param {function} callback - the method that will be executed right after rate limit ends
+   * @return {Promise} result of resent request
+   */
   handle_rate_limit(err, callback) {
     const seconds = err.data["@error"]["@rateLimit"]["Retry-After"] || 1;
-    console.log(this.throttleMessage(seconds));
+    console.warn(`Too much requests. Retry after ${seconds}s`);
     return new Promise((resolve, reject) => {
       setTimeout(() => {
         callback()
@@ -52,14 +44,13 @@ class PhoenixApiClient {
   }
 
   /**
-    * Handles internal server errors if enabled in the constructor options.
-    * @param {object} err - The error object returned from he API
-    * @param {function} callback - the method that will be executed after 500ms
-    * @return {Promise} result of resent request
-  */
+   * Handles internal server errors if enabled in the constructor options.
+   * @param {object} err - The error object returned from he API
+   * @param {function} callback - the method that will be executed after 500ms
+   * @return {Promise} result of resent request
+   */
   handle_internal_server_error(err, callback) {
-    console.log(err);
-    console.log("Internal server error. Retrying...");
+    console.warn("Internal server error. Retrying...", err);
     return new Promise((resolve, reject) => {
       setTimeout(() => {
         callback()
@@ -70,15 +61,16 @@ class PhoenixApiClient {
   }
 
   /**
-    * Loads the user by the Bearer token, sets session expiration time
-    * @param {string} token - Bearer token
-  */
-  async load_user(token, attempt = 1) {
+   * Loads the user by the Bearer token, sets session expiration time
+   * @param {string} token - Bearer token
+   * @param {number} _attempt - attempt number (used for retries limitation)
+   */
+  async load_user(token, _attempt = 1) {
     try {
-      const headers = this.phoenix_auth_headers(token);
+      const headers = this._phoenix_auth_headers(token);
       const response = await axios.get(
         this._phoenix_url("/oauth/access-token", true),
-        { headers: headers }
+        {headers: headers}
       );
       history.pushState(
         "",
@@ -96,33 +88,30 @@ class PhoenixApiClient {
       err = err.response;
       if (err.status === 429 && this.options.handle_rate_limit) {
         await this.handle_rate_limit(err, async () => {
-          await this.load_user(token, attempt);
+          await this.load_user(token, _attempt);
         });
       }
-
       if (
         err.status >= 500 &&
         err.status <= 599 &&
         this.options.handle_server_error &&
-        attempt <= this.options.handle_server_error
+        _attempt <= this.options.handle_server_error
       ) {
         await this.handle_internal_server_error(err, async () => {
-          attempt++;
-          return await this.load_user(token, attempt);
+          _attempt++;
+          return await this.load_user(token, _attempt);
         });
       }
-
       throw err;
     }
   }
 
   /**
-    * Signs out the authenticated user
-  */
+   * Signs out the authenticated user
+   */
   sign_out() {
     sessionStorage.removeItem(this.options.session_name);
     this.user = null;
-    this.extension_id = null;
     this.options = {
       client_id: null,
       handle_rate_limit: true,
@@ -132,22 +121,19 @@ class PhoenixApiClient {
   }
 
   /**
-    * Signs out the user with expired session
-  */
+   * Signs out the user with expired session
+   */
   handle_expired_session() {
     alert("You session has expired. Please sign in again.");
     this.sign_out();
   }
 
   /**
-    * Sets the user for the session, sets session expiration time
-    * @param {object} user - object with user id, token and expiration time
-  */
+   * Sets the user for the session, sets session expiration time
+   * @param {object} user - object with user id, token and expiration time
+   */
   set_user(user) {
     this.user = user;
-    this.set_extension(
-      user.hasOwnProperty("extension") ? user["extension"] : null
-    );
     if (user["expiration"]) {
       const timeout = user["expiration"] - Date.now() - 10000;
       if (timeout < 0) {
@@ -163,56 +149,47 @@ class PhoenixApiClient {
   }
 
   /**
-    * Sets extension id
-    * @param {number} extension_id - Extension Id that will be used for calls
-  */
-  set_extension(extension_id) {
-    this.extension_id = extension_id;
-  }
-
-  /**
-    * Generates sign in page link for the user
-    * @return {string} A _get_auth_link method result.
-  */
+   * Returns sign in page link for the user
+   * @return {string} A _get_auth_link method result.
+   */
   get_auth_link() {
     return this._get_auth_link("", true);
   }
 
   /**
-    * Generates sign in page link for the user.
-    * @param {string} redirect_path - path to the specific redirect page
-    * @param {boolean} is_token - specifies is response_type in the uri should be 
-    * token (if true) or code  (if false)
-    * @return {string} sign in uri
-  */
+   * Generates sign in page link for the user.
+   * @param {string} redirect_path - path to the specific redirect page
+   * @param {boolean} is_token - specifies is response_type in the uri should be
+   * token (if true) or code  (if false)
+   * @return {string} sign in uri
+   */
   _get_auth_link(redirect_path, is_token) {
     let state;
     const state_storage_key = `${this.options.session_name}_state`;
-    if(localStorage.getItem(state_storage_key)){
+    if (localStorage.getItem(state_storage_key)) {
       state = localStorage.getItem(state_storage_key);
-    }else{
+    } else {
       state = Math.floor(Math.random() * 10000000).toString();
       localStorage.setItem(state_storage_key, state);
     }
     const redirect = `${document.location.protocol}//${document.location.host}${redirect_path}`;
     return `https://oauth.phone.com/?client_id=${
       this.options.client_id
-    }&response_type=${
+      }&response_type=${
       is_token ? "token" : "code"
-    }&scope=${encodeURIComponent(this.options.scope.join(' '))}&redirect_uri=${encodeURIComponent(
+      }&scope=${encodeURIComponent(this.options.scope.join(' '))}&redirect_uri=${encodeURIComponent(
       redirect
     )}&state=${state}`;
   }
 
   /**
-    * Generates base url for the api calls
-    * @param {string} uri - path to specific resource
-    * @param {boolean} global - if false - looks on the user account level, 
-    * true - looks generaly 
-    * @return {string} generated url
-  */
-  _phoenix_url(uri, global) {
-    let url = "https://api.cit-phone.com/v4";
+   * Generates base url for the api calls
+   * @param {string} uri - path to specific resource
+   * @param {boolean} global - generates URL with "/v4/account/:account_id", true - generates url with "/v4" only
+   * @return {string} generated url
+   */
+  _phoenix_url(uri, global = false) {
+    let url = "https://api.phone.com/v4";
     if (!global) {
       url += `/accounts/${this.user["id"]}`;
     }
@@ -220,35 +197,32 @@ class PhoenixApiClient {
   }
 
   /**
-    * Generates headers for API calls.
-    * @param {string} token - nullable, session user token or Bearer token
-    * @return {object} headers object
-  */
-  phoenix_auth_headers(token) {
+   * Generates headers for API calls.
+   * @param {string|null} token - user token (required if user is not set)
+   * @return {object} headers object
+   */
+  _phoenix_auth_headers(token = null) {
     return (this.user && this.user["token"]) || token
       ? {
-          Authorization: token ? token : this.user["token"],
-          Prefer: "representation=minimal",
-        }
+        Authorization: token ? token : this.user["token"],
+        Prefer: "representation=minimal",
+      }
       : {};
   }
 
   /**
-    * Gets all items specified in the uri.
-    * @param {string} uri - target resource uri
-    * @return {object} object containing all requested items
-  */
-  async get_list_all(uri) {
+   * Gets all items specified in the uri.
+   * @param {string} uri - target resource uri
+   * @param {boolean} global - generates URL with "/v4/account/:account_id", true - generates url with "/v4" only
+   * @return {object} object containing all requested items
+   */
+  async get_list_all(uri, global = false) {
     let all = [];
     let res;
     do {
-      res = await this.get_list(
-        uri,
-        500,
-        res ? res["offset"] + res["limit"] : 0
-      );
+      res = await this.get_list(uri, 500, res ? res["offset"] + res["limit"] : 0, global);
       all = all.concat(res["items"]);
-    } while (res["total"] < all.length);
+    } while ((res["total"] < all.length) && res["items"].length);
     return {
       items: all,
       offset: 0,
@@ -258,15 +232,15 @@ class PhoenixApiClient {
   }
 
   /**
-    * Gets items specified in the uri.
-    * @param {string} uri - target resource uri
-    * @param {number} limit - API limit
-    * @param {number} offset - API offset
-    * @param {boolean} global - if false - looks on the user account level, 
-    * true - looks generaly 
-    * @return {object} object containing requested items
-  */
-  async get_list(uri, limit, offset, global, attempt = 1) {
+   * Gets items specified in the uri.
+   * @param {string} uri - target resource uri
+   * @param {number} limit - API limit
+   * @param {number} offset - API offset
+   * @param {boolean} global - generates URL with "/v4/account/:account_id", true - generates url with "/v4" only
+   * @param {number} _attempt - attempt number (used for retries limitation)
+   * @return {object} object containing requested items
+   */
+  async get_list(uri, limit = 25, offset = 0, global = false, _attempt = 1) {
     try {
       if (limit) {
         uri += uri.includes("?") ? "&" : "?";
@@ -274,7 +248,7 @@ class PhoenixApiClient {
         if (offset) uri += "&offset=" + offset;
       }
       const r = await axios.get(this._phoenix_url(uri, global), {
-        headers: this.phoenix_auth_headers(),
+        headers: this._phoenix_auth_headers(),
       });
       return {
         items: r.data["items"],
@@ -283,21 +257,20 @@ class PhoenixApiClient {
         limit: r.data["limit"],
       };
     } catch (err) {
-      err = err;
       if (err.status === 429 && this.options.handle_rate_limit) {
         return await this.handle_rate_limit(err, async () => {
-          return await this.get_list(uri, limit, offset, global, attempt);
+          return await this.get_list(uri, limit, offset, global, _attempt);
         });
       }
       if (
         err.status >= 500 &&
         err.status <= 599 &&
         this.options.handle_server_error &&
-        attempt <= this.options.handle_server_error
+        _attempt <= this.options.handle_server_error
       ) {
         await this.handle_internal_server_error(err, async () => {
-          attempt++;
-          return await this.get_list(uri, limit, offset, global, attempt);
+          _attempt++;
+          return await this.get_list(uri, limit, offset, global, _attempt);
         });
       }
       throw err;
@@ -305,32 +278,33 @@ class PhoenixApiClient {
   }
 
   /**
-    * Gets the item specified in the uri
-    * @param {string} uri - target resource uri
-    * @return {object} response object.
-  */
-  async get_item(uri, attempt = 1) {
+   * Gets the item specified in the uri
+   * @param {string} uri - target resource uri
+   * @param {number} _attempt - attempt number (used for retries limitation)
+   * @return {object} response object.
+   */
+  async get_item(uri, _attempt = 1) {
     try {
       const item = await axios.get(this._phoenix_url(uri), {
-        headers: this.phoenix_auth_headers(),
+        headers: this._phoenix_auth_headers(),
       });
       return item.data;
     } catch (err) {
       err = err.response;
       if (err.status === 429 && this.options.handle_rate_limit) {
         return await this.handle_rate_limit(err, async () => {
-          return await this.get_item(uri, attempt);
+          return await this.get_item(uri, _attempt);
         });
       }
       if (
         err.status >= 500 &&
         err.status <= 599 &&
         this.options.handle_server_error &&
-        attempt <= this.options.handle_server_error
+        _attempt <= this.options.handle_server_error
       ) {
         await this.handle_internal_server_error(err, async () => {
-          attempt++;
-          return await this.get_item(uri, attempt);
+          _attempt++;
+          return await this.get_item(uri, _attempt);
         });
       }
       throw err;
@@ -338,32 +312,33 @@ class PhoenixApiClient {
   }
 
   /**
-    * Deletes the item specified in the uri
-    * @param {string} uri - target resource uri
-    * @return {object} response object.
-  */
-  async delete_item(uri, attempt = 1) {
+   * Deletes the item specified in the uri
+   * @param {string} uri - target resource uri
+   * @param {number} _attempt - attempt number (used for retries limitation)
+   * @return {object} response object.
+   */
+  async delete_item(uri, _attempt = 1) {
     try {
       const item = await axios.delete(this._phoenix_url(uri), {
-        headers: this.phoenix_auth_headers(),
+        headers: this._phoenix_auth_headers(),
       });
       return item.data;
     } catch (err) {
       err = err.response;
       if (err.status === 429 && this.options.handle_rate_limit) {
         return await this.handle_rate_limit(err, async () => {
-          return await this.delete_item(uri, attempt);
+          return await this.delete_item(uri, _attempt);
         });
       }
       if (
         err.status >= 500 &&
         err.status <= 599 &&
         this.options.handle_server_error &&
-        attempt <= this.options.handle_server_error
+        _attempt <= this.options.handle_server_error
       ) {
         await this.handle_internal_server_error(err, async () => {
-          attempt++;
-          return await this.delete_item(uri, attempt);
+          _attempt++;
+          return await this.delete_item(uri, _attempt);
         });
       }
       throw err;
@@ -371,34 +346,35 @@ class PhoenixApiClient {
   }
 
   /**
-    * Downloads the item specified in the uri
-    * @param {string} uri - target resource uri
-    * @return {object} response object.
-  */
-  async download_item(uri, attempt = 1) {
+   * Downloads the item specified in the uri
+   * @param {string} uri - target resource uri
+   * @param {number} _attempt - attempt number (used for retries limitation)
+   * @return {object} response object.
+   */
+  async download_item(uri, _attempt = 1) {
     try {
       const item = await axios.get(this._phoenix_url(uri), {
         responseType: "blob",
         timeout: 30000,
-        headers: this.phoenix_auth_headers(),
+        headers: this._phoenix_auth_headers(),
       });
       return item.data;
     } catch (err) {
       err = err.response;
       if (err.status === 429 && this.options.handle_rate_limit) {
         return await this.handle_rate_limit(err, async () => {
-          return await this.download_item(uri, attempt);
+          return await this.download_item(uri, _attempt);
         });
       }
       if (
         err.status >= 500 &&
         err.status <= 599 &&
         this.options.handle_server_error &&
-        attempt <= this.options.handle_server_error
+        _attempt <= this.options.handle_server_error
       ) {
         await this.handle_internal_server_error(err, async () => {
-          attempt++;
-          return await this.download_item(uri, attempt);
+          _attempt++;
+          return await this.download_item(uri, _attempt);
         });
       }
       throw err;
@@ -406,33 +382,34 @@ class PhoenixApiClient {
   }
 
   /**
-    * Sends PUT request to update the item specified in the uri
-    * @param {string} uri - target resource uri
-    * @param {object} data - data that should be updated
-    * @return {object} response object.
-  */
-  async replace_item(uri, data, attempt = 1) {
+   * Sends PUT request to update the item specified in the uri
+   * @param {string} uri - target resource uri
+   * @param {object} data - data that should be updated
+   * @param {number} _attempt - attempt number (used for retries limitation)
+   * @return {object} response object.
+   */
+  async replace_item(uri, data, _attempt = 1) {
     try {
       const item = await axios.put(this._phoenix_url(uri), data, {
-        headers: this.phoenix_auth_headers(),
+        headers: this._phoenix_auth_headers(),
       });
       return item.data;
     } catch (err) {
       err = err.response;
       if (err.status === 429 && this.options.handle_rate_limit) {
         return await this.handle_rate_limit(err, async () => {
-          return await this.replace_item(uri, data, attempt);
+          return await this.replace_item(uri, data, _attempt);
         });
       }
       if (
         err.status >= 500 &&
         err.status <= 599 &&
         this.options.handle_server_error &&
-        attempt <= this.options.handle_server_error
+        _attempt <= this.options.handle_server_error
       ) {
         await this.handle_internal_server_error(err, async () => {
-          attempt++;
-          return await this.replace_item(uri, data, attempt);
+          _attempt++;
+          return await this.replace_item(uri, data, _attempt);
         });
       }
       throw err;
@@ -440,33 +417,34 @@ class PhoenixApiClient {
   }
 
   /**
-    * Sends PATCH request to update the item specified in the uri
-    * @param {string} uri - target resource uri
-    * @param {object} data - data that should be updated
-    * @return {object} response object.
-  */
-  async patch_item(uri, data, attempt = 1) {
+   * Sends PATCH request to update the item specified in the uri
+   * @param {string} uri - target resource uri
+   * @param {object} data - data that should be updated
+   * @param {number} _attempt - attempt number (used for retries limitation)
+   * @return {object} response object.
+   */
+  async patch_item(uri, data, _attempt = 1) {
     try {
       const item = await axios.patch(this._phoenix_url(uri), data, {
-        headers: this.phoenix_auth_headers(),
+        headers: this._phoenix_auth_headers(),
       });
       return item.data;
     } catch (err) {
       err = err.response;
       if (err.status === 429 && this.options.handle_rate_limit) {
         return await this.handle_rate_limit(err, async () => {
-          return await this.patch_item(uri, data, attempt);
+          return await this.patch_item(uri, data, _attempt);
         });
       }
       if (
         err.status >= 500 &&
         err.status <= 599 &&
         this.options.handle_server_error &&
-        attempt <= this.options.handle_server_error
+        _attempt <= this.options.handle_server_error
       ) {
         await this.handle_internal_server_error(err, async () => {
-          attempt++;
-          return await this.patch_item(uri, data, attempt);
+          _attempt++;
+          return await this.patch_item(uri, data, _attempt);
         });
       }
       throw err;
@@ -474,33 +452,34 @@ class PhoenixApiClient {
   }
 
   /**
-    * Created the resource specified in the uri
-    * @param {string} uri - target resource uri
-    * @param {object} data - data that should be created
-    * @return {object} response object.
-  */
-  async create_item(uri, data, attempt = 1) {
+   * Created the resource specified in the uri
+   * @param {string} uri - target resource uri
+   * @param {object} data - data that should be created
+   * @param {number} _attempt - attempt number (used for retries limitation)
+   * @return {object} response object.
+   */
+  async create_item(uri, data, _attempt = 1) {
     try {
       const item = await axios.post(this._phoenix_url(uri), data, {
-        headers: this.phoenix_auth_headers(),
+        headers: this._phoenix_auth_headers(),
       });
       return item.data;
     } catch (err) {
       err = err.response;
       if (err.status === 429 && this.options.handle_rate_limit) {
         return await this.handle_rate_limit(err, async () => {
-          return await this.create_item(uri, data, attempt);
+          return await this.create_item(uri, data, _attempt);
         });
       }
       if (
         err.status >= 500 &&
         err.status <= 599 &&
         this.options.handle_server_error &&
-        attempt <= this.options.handle_server_error
+        _attempt <= this.options.handle_server_error
       ) {
         await this.handle_internal_server_error(err, async () => {
-          attempt++;
-          return await this.create_item(uri, data, attempt);
+          _attempt++;
+          return await this.create_item(uri, data, _attempt);
         });
       }
       throw err;
