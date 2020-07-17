@@ -2,9 +2,9 @@ const axios = require("axios");
 
 /** Class representing a PhoenixApi client. */
 class PhoenixApiClient {
-
   user = null;
-
+  token = null;
+  state = null;
   options = {
     client_id: null,
     handle_rate_limit: true,
@@ -19,10 +19,56 @@ class PhoenixApiClient {
    */
   constructor(options = {}) {
     Object.assign(this.options, options);
-    // TODO Add function which will check window's hash, and load token from where if provided. It is also where you should check "state".
+    // TODO Add function which will check window's hash,
+    // and load token from where if provided.
+    // It is also where you should check "state".
+    this.checkToken();
+    this.checkState();
     let user = sessionStorage.getItem(this.options.session_name);
     if (user) user = JSON.parse(user);
     user && this.set_user(user);
+  }
+
+  /*
+   * Checks if uri has token
+   * @return {string, boolean} - token if found, false if not
+   */
+  checkToken() {
+    const parse_query = (hash_string) => {
+      const hash = hash_string
+        .substr(1)
+        .split("&")
+        .filter((v) => !!v.length)
+        .map((v) => v.split("="));
+      const hashObject = {};
+      for (let i of Object.keys(hash)) {
+        hashObject[decodeURIComponent(hash[i][0])] = decodeURIComponent(
+          hash[i][1]
+        );
+      }
+      return hashObject;
+    };
+    if (document.location.hash.includes("token_type=Bearer")) {
+      const hashObject = parse_query(document.location.hash);
+      this.token = `${hashObject["token_type"]} ${hashObject["access_token"]}`;
+
+      return this.token;
+    }
+
+    return false;
+  }
+
+  /*
+   * Checks if state is in localstorage
+   */
+  checkState() {
+    const state_storage_key = `${this.options.session_name}_state`;
+    if (localStorage.getItem(state_storage_key)) {
+      this.state = localStorage.getItem(state_storage_key);
+    } else {
+      this.state = Math.floor(Math.random() * 10000000).toString();
+      localStorage.setItem(state_storage_key, this.state);
+    }
   }
 
   /**
@@ -65,12 +111,13 @@ class PhoenixApiClient {
    * @param {string} token - Bearer token
    * @param {number} _attempt - attempt number (used for retries limitation)
    */
+  // TODO instead of constructor use static method INIT
   async load_user(token, _attempt = 1) {
     try {
       const headers = this._phoenix_auth_headers(token);
       const response = await axios.get(
         this._phoenix_url("/oauth/access-token", true),
-        {headers: headers}
+        { headers: headers }
       );
       history.pushState(
         "",
@@ -99,7 +146,7 @@ class PhoenixApiClient {
       ) {
         await this.handle_internal_server_error(err, async () => {
           _attempt++;
-          return await this.load_user(token, _attempt);
+          return await this.load_user(_attempt);
         });
       }
       throw err;
@@ -164,22 +211,12 @@ class PhoenixApiClient {
    * @return {string} sign in uri
    */
   _get_auth_link(redirect_path, is_token) {
-    let state;
-    const state_storage_key = `${this.options.session_name}_state`;
-    if (localStorage.getItem(state_storage_key)) {
-      state = localStorage.getItem(state_storage_key);
-    } else {
-      state = Math.floor(Math.random() * 10000000).toString();
-      localStorage.setItem(state_storage_key, state);
-    }
     const redirect = `${document.location.protocol}//${document.location.host}${redirect_path}`;
     return `https://oauth.phone.com/?client_id=${
       this.options.client_id
-      }&response_type=${
-      is_token ? "token" : "code"
-      }&scope=${encodeURIComponent(this.options.scope.join(' '))}&redirect_uri=${encodeURIComponent(
-      redirect
-    )}&state=${state}`;
+    }&response_type=${is_token ? "token" : "code"}&scope=${encodeURIComponent(
+      this.options.scope.join(" ")
+    )}&redirect_uri=${encodeURIComponent(redirect)}&state=${this.state}`;
   }
 
   /**
@@ -204,9 +241,9 @@ class PhoenixApiClient {
   _phoenix_auth_headers(token = null) {
     return (this.user && this.user["token"]) || token
       ? {
-        Authorization: token ? token : this.user["token"],
-        Prefer: "representation=minimal",
-      }
+          Authorization: token ? token : this.user["token"],
+          Prefer: "representation=minimal",
+        }
       : {};
   }
 
@@ -220,9 +257,14 @@ class PhoenixApiClient {
     let all = [];
     let res;
     do {
-      res = await this.get_list(uri, 500, res ? res["offset"] + res["limit"] : 0, global);
+      res = await this.get_list(
+        uri,
+        500,
+        res ? res["offset"] + res["limit"] : 0,
+        global
+      );
       all = all.concat(res["items"]);
-    } while ((res["total"] < all.length) && res["items"].length);
+    } while (res["total"] < all.length && res["items"].length);
     return {
       items: all,
       offset: 0,
