@@ -61,7 +61,7 @@ class PhoenixApiClient {
         return false;
       }
       this.token = `${hashObject["token_type"]} ${hashObject["access_token"]}`;
-      await this.load_user(this.token);
+      await this._load_user(this.token);
       return true;
     }
     return false;
@@ -123,12 +123,12 @@ class PhoenixApiClient {
    * @param {string} token - Bearer token
    * @param {number} _attempt - attempt number (used for retries limitation)
    */
-  async load_user(token, _attempt = 1) {
+  async _load_user(token, _attempt = 1) {
     try {
       const headers = this._phoenix_auth_headers(token);
       const response = await axios.get(
         this._phoenix_url("/oauth/access-token", true),
-        { headers: headers }
+        {headers: headers}
       );
       history.pushState(
         "",
@@ -146,7 +146,7 @@ class PhoenixApiClient {
       const err = e.response;
       if (err.status === 429 && this.options.handle_rate_limit) {
         await this.handle_rate_limit(err, async () => {
-          await this.load_user(token, _attempt);
+          await this._load_user(token, _attempt);
         });
       }
       if (
@@ -157,7 +157,7 @@ class PhoenixApiClient {
       ) {
         await this.handle_internal_server_error(err, async () => {
           _attempt++;
-          return await this.load_user(_attempt);
+          return await this._load_user(token, _attempt);
         });
       }
       throw err;
@@ -208,25 +208,25 @@ class PhoenixApiClient {
   }
 
   /**
-   * Returns sign in page link for the user
+   * Returns sign in page URL for the user
    * @return {string} A _get_auth_link method result.
    */
-  get_auth_link() {
-    return this._get_auth_link("", true);
+  get oauth_url() {
+    return this._get_oauth_url("", true);
   }
 
   /**
-   * Generates sign in page link for the user.
+   * Generates sign in page URL for the user.
    * @param {string} redirect_path - path to the specific redirect page
    * @param {boolean} is_token - specifies is response_type in the uri should be
    * token (if true) or code  (if false)
    * @return {string} sign in uri
    */
-  _get_auth_link(redirect_path, is_token) {
+  _get_oauth_url(redirect_path, is_token) {
     const redirect = `${document.location.protocol}//${document.location.host}${redirect_path}`;
     return `https://oauth.phone.com/?client_id=${
       this.options.client_id
-    }&response_type=${is_token ? "token" : "code"}&scope=${encodeURIComponent(
+      }&response_type=${is_token ? "token" : "code"}&scope=${encodeURIComponent(
       this.options.scope.join(" ")
     )}&redirect_uri=${encodeURIComponent(redirect)}&state=${this._state}`;
   }
@@ -247,15 +247,13 @@ class PhoenixApiClient {
 
   /**
    * Generates headers for API calls.
-   * @param {string|null} token - user token (required if user is not set)
+   * @param {string} token - user token (required if user is not set)
    * @return {object} headers object
    */
-  _phoenix_auth_headers(token = null) {
-    return (this.user && this.user["token"]) || token
-      ? {
-          Authorization: token ? token : this.user["token"],
-          Prefer: "representation=minimal",
-        }
+  _phoenix_auth_headers(token = '') {
+    const token_provided = token && token.length;
+    return (this.user && this.user["token"]) || token_provided
+      ? {'Authorization': token_provided ? token : this.user["token"]}
       : {};
   }
 

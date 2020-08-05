@@ -61,8 +61,8 @@ Client object implements some methods you can use:
 
 | method | args | description |
 |--|--|--|
-| get_auth_link | property | generates sign-in uri. User now can sign in by filling the form, which response will return Bearer token needed for the [OAuth 2.0](https://tools.ietf.org/html/rfc6749). If you use token based authentication, please skip this step. 
-| load_user | token (string) **required** | accepts Bearer token, always starts with Bearer. Sets up the user for the session.
+| oauth_url | property | generates sign-in uri. User now can sign in by filling the form, which response will return Bearer token needed for the [OAuth 2.0](https://tools.ietf.org/html/rfc6749). If you use token based authentication, please skip this step.
+| init_user |  | sets up the user for the session.
 | sign_out |  | sings out the user
 | create_item | uri: string, required; data: object, required | Sends POST request to create the item
 | get_item | uri: string, required | returns the item specified in the uri.
