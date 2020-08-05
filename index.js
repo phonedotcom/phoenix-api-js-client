@@ -19,10 +19,6 @@ class PhoenixApiClient {
    */
   constructor(options = {}) {
     Object.assign(this.options, options);
-    // TODO Add function which will check window's hash,
-    // and load token from where if provided.
-    // It is also where you should check "state".
-    this.checkToken();
     this.checkState();
     let user = sessionStorage.getItem(this.options.session_name);
     if (user) user = JSON.parse(user);
@@ -31,9 +27,11 @@ class PhoenixApiClient {
 
   /*
    * Checks if uri has token
-   * @return {string, boolean} - token if found, false if not
+   * @return {boolean} - if token is found - true, else false
    */
-  checkToken() {
+  async init() {
+    if (this.user) return true;
+
     const parse_query = (hash_string) => {
       const hash = hash_string
         .substr(1)
@@ -52,7 +50,8 @@ class PhoenixApiClient {
       const hashObject = parse_query(document.location.hash);
       this.token = `${hashObject["token_type"]} ${hashObject["access_token"]}`;
 
-      return this.token;
+      await this.load_user(this.token);
+      return true;
     }
 
     return false;
@@ -131,8 +130,8 @@ class PhoenixApiClient {
           ? response.data["expires_at"] * 1000
           : null,
       });
-    } catch (err) {
-      err = err.response;
+    } catch (e) {
+      const err = e.response;
       if (err.status === 429 && this.options.handle_rate_limit) {
         await this.handle_rate_limit(err, async () => {
           await this.load_user(token, _attempt);
@@ -165,6 +164,7 @@ class PhoenixApiClient {
       handle_server_error: 3,
       session_name: "phoenix-api-js-client-session",
     };
+    sessionStorage.removeItem(this.options.session_name);
   }
 
   /**
@@ -298,7 +298,8 @@ class PhoenixApiClient {
         total: r.data["total"],
         limit: r.data["limit"],
       };
-    } catch (err) {
+    } catch (e) {
+      const err = e.response;
       if (err.status === 429 && this.options.handle_rate_limit) {
         return await this.handle_rate_limit(err, async () => {
           return await this.get_list(uri, limit, offset, global, _attempt);
@@ -331,8 +332,8 @@ class PhoenixApiClient {
         headers: this._phoenix_auth_headers(),
       });
       return item.data;
-    } catch (err) {
-      err = err.response;
+    } catch (e) {
+      const err = e.response;
       if (err.status === 429 && this.options.handle_rate_limit) {
         return await this.handle_rate_limit(err, async () => {
           return await this.get_item(uri, _attempt);
@@ -365,8 +366,8 @@ class PhoenixApiClient {
         headers: this._phoenix_auth_headers(),
       });
       return item.data;
-    } catch (err) {
-      err = err.response;
+    } catch (e) {
+      const err = e.response;
       if (err.status === 429 && this.options.handle_rate_limit) {
         return await this.handle_rate_limit(err, async () => {
           return await this.delete_item(uri, _attempt);
@@ -401,8 +402,8 @@ class PhoenixApiClient {
         headers: this._phoenix_auth_headers(),
       });
       return item.data;
-    } catch (err) {
-      err = err.response;
+    } catch (e) {
+      const err = e.response;
       if (err.status === 429 && this.options.handle_rate_limit) {
         return await this.handle_rate_limit(err, async () => {
           return await this.download_item(uri, _attempt);
@@ -436,8 +437,8 @@ class PhoenixApiClient {
         headers: this._phoenix_auth_headers(),
       });
       return item.data;
-    } catch (err) {
-      err = err.response;
+    } catch (e) {
+      const err = e.response;
       if (err.status === 429 && this.options.handle_rate_limit) {
         return await this.handle_rate_limit(err, async () => {
           return await this.replace_item(uri, data, _attempt);
@@ -471,8 +472,8 @@ class PhoenixApiClient {
         headers: this._phoenix_auth_headers(),
       });
       return item.data;
-    } catch (err) {
-      err = err.response;
+    } catch (e) {
+      const err = e.response;
       if (err.status === 429 && this.options.handle_rate_limit) {
         return await this.handle_rate_limit(err, async () => {
           return await this.patch_item(uri, data, _attempt);
@@ -506,8 +507,8 @@ class PhoenixApiClient {
         headers: this._phoenix_auth_headers(),
       });
       return item.data;
-    } catch (err) {
-      err = err.response;
+    } catch (e) {
+      const err = e.response;
       if (err.status === 429 && this.options.handle_rate_limit) {
         return await this.handle_rate_limit(err, async () => {
           return await this.create_item(uri, data, _attempt);
