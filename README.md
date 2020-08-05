@@ -34,9 +34,17 @@ const options = {
 // 3. Create client object
 const phoenix_client = new PhoenixClient(options);
 
-phoenix_client.get_list('/messages')
-  .then(console.log)
-  .catch(console.error);
+// 4. Load user
+phoenix_client.init_user().then(authorized => {
+  if (authorized) {
+      // 5. Make a request
+      phoenix_client.get_list('/messages')
+        .then(console.log)
+        .catch(console.error);
+  } else {
+    console.log('We can redirect user to the login form');
+  }
+}).catch(console.error);
 ```
 
 ### Options
