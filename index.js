@@ -19,6 +19,10 @@ class PhoenixApiClient {
    */
   constructor(options = {}) {
     Object.assign(this.options, options);
+    this.listeners = {
+      "logged-out": null,
+      "session-expired": null,
+    }
   }
 
   /**
@@ -28,7 +32,7 @@ class PhoenixApiClient {
   async init_user() {
     let user = sessionStorage.getItem(this.options.session_name);
     if (user) user = JSON.parse(user);
-    if (!(user && this.set_user(user))) {
+    if (!(user && await this.set_user(user))) {
       await this._oauth();
     }
     return !!this.user;
@@ -135,7 +139,7 @@ class PhoenixApiClient {
         document.title,
         `${window.location.pathname}${window.location.search}`
       );
-      this.set_user({
+      await this.set_user({
         id: response.data["scope_details"][0]["voip_id"],
         token: token,
         expiration: response.data["expires_at"]
@@ -167,7 +171,12 @@ class PhoenixApiClient {
   /**
    * Signs out the authenticated user
    */
-  sign_out() {
+  async sign_out() {
+    try{  
+      await this.delete_access_token();
+    }catch(err){
+      console.log(err)
+    }
     sessionStorage.removeItem(this.options.session_name);
     this.user = null;
     this.options = {
@@ -177,32 +186,70 @@ class PhoenixApiClient {
       session_name: "phoenix-api-js-client-session",
     };
     sessionStorage.removeItem(this.options.session_name);
+    if(this.listeners['logged-out']) this.listeners['logged-out']();
+  }
+
+  /**
+   * Deletes current access token
+   * @param {number} _attempt - attempt number (used for retries limitation)
+   * @return {object} response object.
+   */
+  async delete_access_token(_attempt = 1) {
+    try {
+      const item = await axios.delete(this._phoenix_url('/oauth/access-token', true), {
+        headers: this._phoenix_auth_headers(),
+      });
+      return item.data;
+    } catch (e) {
+      const err = e.response;
+      if (err.status === 429 && this.options.handle_rate_limit) {
+        return await this.handle_rate_limit(err, async () => {
+          return await this.delete_access_token(_attempt);
+        });
+      }
+      if (
+        err.status >= 500 &&
+        err.status <= 599 &&
+        this.options.handle_server_error &&
+        _attempt <= this.options.handle_server_error
+      ) {
+        await this.handle_internal_server_error(err, async () => {
+          _attempt++;
+          return await this.delete_access_token(_attempt);
+        });
+      }
+      throw err;
+    }
+  }
+
+  on(eventname, callback){
+    this.listeners[eventname] = callback;
   }
 
   /**
    * Signs out the user with expired session
    */
-  handle_expired_session() {
-    alert("You session has expired. Please sign in again.");
-    this.sign_out();
+  async handle_expired_session() {
+    await this.sign_out();
+    if(this.listeners['session-expired']) this.listeners['session-expired']();
   }
 
   /**
    * Sets the user for the session, sets session expiration time
    * @param {object} user - object with user id, token and expiration time
    */
-  set_user(user) {
+  async set_user(user) {
     this.user = user;
     if (user["expiration"]) {
       const timeout = user["expiration"] - Date.now() - 10000;
       if (timeout < 0) {
-        this.handle_expired_session();
+        await this.handle_expired_session();
       } else {
         sessionStorage.setItem(
           this.options.session_name,
           JSON.stringify(user, null, 2)
         );
-        setTimeout(this.handle_expired_session.bind(this), timeout);
+        setTimeout(await this.handle_expired_session.bind(this), timeout);
       }
     }
   }
