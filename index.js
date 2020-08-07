@@ -22,7 +22,7 @@ class PhoenixApiClient {
     this.listeners = {
       "logged-out": null,
       "session-expired": null,
-    }
+    };
   }
 
   /**
@@ -32,7 +32,7 @@ class PhoenixApiClient {
   async init_user() {
     let user = sessionStorage.getItem(this.options.session_name);
     if (user) user = JSON.parse(user);
-    if (!(user && await this.set_user(user))) {
+    if (!(user && (await this.set_user(user)))) {
       await this._oauth();
     }
     return !!this.user;
@@ -132,7 +132,7 @@ class PhoenixApiClient {
       const headers = this._phoenix_auth_headers(token);
       const response = await axios.get(
         this._phoenix_url("/oauth/access-token", true),
-        {headers: headers}
+        { headers: headers }
       );
       history.pushState(
         "",
@@ -171,11 +171,11 @@ class PhoenixApiClient {
   /**
    * Signs out the authenticated user
    */
-  async sign_out() {
-    try{  
+  async sign_out(session_expired = false) {
+    try {
       await this.delete_access_token();
-    }catch(err){
-      console.log(err)
+    } catch (err) {
+      console.log(err);
     }
     sessionStorage.removeItem(this.options.session_name);
     this.user = null;
@@ -186,7 +186,8 @@ class PhoenixApiClient {
       session_name: "phoenix-api-js-client-session",
     };
     sessionStorage.removeItem(this.options.session_name);
-    if(this.listeners['logged-out']) this.listeners['logged-out']();
+    if (this.listeners["logged-out"] && !session_expired)
+      this.listeners["logged-out"]();
   }
 
   /**
@@ -196,9 +197,12 @@ class PhoenixApiClient {
    */
   async delete_access_token(_attempt = 1) {
     try {
-      const item = await axios.delete(this._phoenix_url('/oauth/access-token', true), {
-        headers: this._phoenix_auth_headers(),
-      });
+      const item = await axios.delete(
+        this._phoenix_url("/oauth/access-token", true),
+        {
+          headers: this._phoenix_auth_headers(),
+        }
+      );
       return item.data;
     } catch (e) {
       const err = e.response;
@@ -222,7 +226,7 @@ class PhoenixApiClient {
     }
   }
 
-  on(eventname, callback){
+  on(eventname, callback) {
     this.listeners[eventname] = callback;
   }
 
@@ -230,8 +234,8 @@ class PhoenixApiClient {
    * Signs out the user with expired session
    */
   async handle_expired_session() {
-    await this.sign_out();
-    if(this.listeners['session-expired']) this.listeners['session-expired']();
+    await this.sign_out(true);
+    if (this.listeners["session-expired"]) this.listeners["session-expired"]();
   }
 
   /**
@@ -273,7 +277,7 @@ class PhoenixApiClient {
     const redirect = `${document.location.protocol}//${document.location.host}${redirect_path}`;
     return `https://oauth.phone.com/?client_id=${
       this.options.client_id
-      }&response_type=${is_token ? "token" : "code"}&scope=${encodeURIComponent(
+    }&response_type=${is_token ? "token" : "code"}&scope=${encodeURIComponent(
       this.options.scope.join(" ")
     )}&redirect_uri=${encodeURIComponent(redirect)}&state=${this._state}`;
   }
@@ -297,10 +301,10 @@ class PhoenixApiClient {
    * @param {string} token - user token (required if user is not set)
    * @return {object} headers object
    */
-  _phoenix_auth_headers(token = '') {
+  _phoenix_auth_headers(token = "") {
     const token_provided = token && token.length;
     return (this.user && this.user["token"]) || token_provided
-      ? {'Authorization': token_provided ? token : this.user["token"]}
+      ? { Authorization: token_provided ? token : this.user["token"] }
       : {};
   }
 
