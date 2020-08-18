@@ -1,3 +1,4 @@
+
 # JavaScript Client for api.phone.com.
 
 ## Description
@@ -63,6 +64,7 @@ Client object implements some methods you can use:
 |--|--|--|
 | oauth_url | property | generates sign-in uri. User now can sign in by filling the form, which response will return Bearer token needed for the [OAuth 2.0](https://tools.ietf.org/html/rfc6749). If you use token based authentication, please skip this step.
 | init_user |  | sets up the user for the session.
+| _load_user | token: string, uses_token: boolean | sets up the user for the session. If uses_token is true, token will not be deleted from the account on sign out
 | sign_out |  | sings out the user
 | create_item | uri: string, required; data: object, required | Sends POST request to create the item
 | get_item | uri: string, required | returns the item specified in the uri.

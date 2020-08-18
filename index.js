@@ -2,22 +2,22 @@ const axios = require("axios");
 
 /** Class representing a PhoenixApi client. */
 class PhoenixApiClient {
-  user = null;
-  token = null;
-
-  options = {
-    client_id: null,
-    handle_rate_limit: true,
-    handle_server_error: 3,
-    scope: ["account-owner"],
-    session_name: "phoenix-api-js-client-session",
-  };
-
   /**
    * Create a PhoenixApiClient.
    * @param {object} options - objects that updates class options
    */
   constructor(options = {}) {
+    this.user = null;
+    this.token = null;
+    this.uses_token = false;
+
+    this.options = {
+      client_id: null,
+      handle_rate_limit: true,
+      handle_server_error: 3,
+      scope: ["account-owner"],
+      session_name: "phoenix-api-js-client-session",
+    };
     Object.assign(this.options, options);
     this.listeners = {
       "logged-out": null,
@@ -127,8 +127,9 @@ class PhoenixApiClient {
    * @param {string} token - Bearer token
    * @param {number} _attempt - attempt number (used for retries limitation)
    */
-  async _load_user(token, _attempt = 1) {
+  async _load_user(token, uses_token = false, _attempt = 1) {
     try {
+      this.uses_token = uses_token;
       const headers = this._phoenix_auth_headers(token);
       const response = await axios.get(
         this._phoenix_url("/oauth/access-token", true),
@@ -197,6 +198,8 @@ class PhoenixApiClient {
    */
   async delete_access_token(_attempt = 1) {
     try {
+      if(this.uses_token) return true;
+      
       const item = await axios.delete(
         this._phoenix_url("/oauth/access-token", true),
         {
