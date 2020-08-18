@@ -2,23 +2,27 @@ const axios = require("axios");
 
 /** Class representing a PhoenixApi client. */
 class PhoenixApiClient {
-  user = null;
-  token = null;
-
-  options = {
-    client_id: null,
-    handle_rate_limit: true,
-    handle_server_error: 3,
-    scope: ["account-owner"],
-    session_name: "phoenix-api-js-client-session",
-  };
-
   /**
    * Create a PhoenixApiClient.
    * @param {object} options - objects that updates class options
    */
   constructor(options = {}) {
+    this.user = null;
+    this.token = null;
+    this.uses_token = false;
+
+    this.options = {
+      client_id: null,
+      handle_rate_limit: true,
+      handle_server_error: 3,
+      scope: ["account-owner"],
+      session_name: "phoenix-api-js-client-session",
+    };
     Object.assign(this.options, options);
+    this.listeners = {
+      "logged-out": null,
+      "session-expired": null,
+    };
   }
 
   /**
@@ -28,7 +32,7 @@ class PhoenixApiClient {
   async init_user() {
     let user = sessionStorage.getItem(this.options.session_name);
     if (user) user = JSON.parse(user);
-    if (!(user && this.set_user(user))) {
+    if (!(user && (await this.set_user(user)))) {
       await this._oauth();
     }
     return !!this.user;
@@ -123,19 +127,20 @@ class PhoenixApiClient {
    * @param {string} token - Bearer token
    * @param {number} _attempt - attempt number (used for retries limitation)
    */
-  async _load_user(token, _attempt = 1) {
+  async _load_user(token, uses_token = false, _attempt = 1) {
     try {
+      this.uses_token = uses_token;
       const headers = this._phoenix_auth_headers(token);
       const response = await axios.get(
         this._phoenix_url("/oauth/access-token", true),
-        {headers: headers}
+        { headers: headers }
       );
       history.pushState(
         "",
         document.title,
         `${window.location.pathname}${window.location.search}`
       );
-      this.set_user({
+      await this.set_user({
         id: response.data["scope_details"][0]["voip_id"],
         token: token,
         expiration: response.data["expires_at"]
@@ -167,7 +172,12 @@ class PhoenixApiClient {
   /**
    * Signs out the authenticated user
    */
-  sign_out() {
+  async sign_out(session_expired = false) {
+    try {
+      await this.delete_access_token();
+    } catch (err) {
+      console.log(err);
+    }
     sessionStorage.removeItem(this.options.session_name);
     this.user = null;
     this.options = {
@@ -177,32 +187,76 @@ class PhoenixApiClient {
       session_name: "phoenix-api-js-client-session",
     };
     sessionStorage.removeItem(this.options.session_name);
+    if (this.listeners["logged-out"] && !session_expired)
+      this.listeners["logged-out"]();
+  }
+
+  /**
+   * Deletes current access token
+   * @param {number} _attempt - attempt number (used for retries limitation)
+   * @return {object} response object.
+   */
+  async delete_access_token(_attempt = 1) {
+    try {
+      if(this.uses_token) return true;
+      
+      const item = await axios.delete(
+        this._phoenix_url("/oauth/access-token", true),
+        {
+          headers: this._phoenix_auth_headers(),
+        }
+      );
+      return item.data;
+    } catch (e) {
+      const err = e.response;
+      if (err.status === 429 && this.options.handle_rate_limit) {
+        return await this.handle_rate_limit(err, async () => {
+          return await this.delete_access_token(_attempt);
+        });
+      }
+      if (
+        err.status >= 500 &&
+        err.status <= 599 &&
+        this.options.handle_server_error &&
+        _attempt <= this.options.handle_server_error
+      ) {
+        await this.handle_internal_server_error(err, async () => {
+          _attempt++;
+          return await this.delete_access_token(_attempt);
+        });
+      }
+      throw err;
+    }
+  }
+
+  on(eventname, callback) {
+    this.listeners[eventname] = callback;
   }
 
   /**
    * Signs out the user with expired session
    */
-  handle_expired_session() {
-    alert("You session has expired. Please sign in again.");
-    this.sign_out();
+  async handle_expired_session() {
+    await this.sign_out(true);
+    if (this.listeners["session-expired"]) this.listeners["session-expired"]();
   }
 
   /**
    * Sets the user for the session, sets session expiration time
    * @param {object} user - object with user id, token and expiration time
    */
-  set_user(user) {
+  async set_user(user) {
     this.user = user;
     if (user["expiration"]) {
       const timeout = user["expiration"] - Date.now() - 10000;
       if (timeout < 0) {
-        this.handle_expired_session();
+        await this.handle_expired_session();
       } else {
         sessionStorage.setItem(
           this.options.session_name,
           JSON.stringify(user, null, 2)
         );
-        setTimeout(this.handle_expired_session.bind(this), timeout);
+        setTimeout(await this.handle_expired_session.bind(this), timeout);
       }
     }
   }
@@ -226,7 +280,7 @@ class PhoenixApiClient {
     const redirect = `${document.location.protocol}//${document.location.host}${redirect_path}`;
     return `https://oauth.phone.com/?client_id=${
       this.options.client_id
-      }&response_type=${is_token ? "token" : "code"}&scope=${encodeURIComponent(
+    }&response_type=${is_token ? "token" : "code"}&scope=${encodeURIComponent(
       this.options.scope.join(" ")
     )}&redirect_uri=${encodeURIComponent(redirect)}&state=${this._state}`;
   }
@@ -250,10 +304,10 @@ class PhoenixApiClient {
    * @param {string} token - user token (required if user is not set)
    * @return {object} headers object
    */
-  _phoenix_auth_headers(token = '') {
+  _phoenix_auth_headers(token = "") {
     const token_provided = token && token.length;
     return (this.user && this.user["token"]) || token_provided
-      ? {'Authorization': token_provided ? token : this.user["token"]}
+      ? { Authorization: token_provided ? token : this.user["token"] }
       : {};
   }
 
