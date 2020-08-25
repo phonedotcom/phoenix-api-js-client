@@ -328,7 +328,7 @@ class PhoenixApiClient {
         global
       );
       all = all.concat(res["items"]);
-    } while (res["total"] < all.length && res["items"].length);
+    } while (res["total"] > all.length && res["items"].length);
     return {
       items: all,
       offset: 0,
