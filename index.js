@@ -198,8 +198,8 @@ class PhoenixApiClient {
    */
   async delete_access_token(_attempt = 1) {
     try {
-      if(this.uses_token) return true;
-      
+      if (this.uses_token) return true;
+
       const item = await axios.delete(
         this._phoenix_url("/oauth/access-token", true),
         {
@@ -348,11 +348,16 @@ class PhoenixApiClient {
    */
   async get_list(uri, limit = 25, offset = 0, global = false, _attempt = 1) {
     try {
+      const urlParams = new URLSearchParams(uri);
       if (limit) {
-        uri += uri.includes("?") ? "&" : "?";
-        uri += "limit=" + limit;
-        if (offset) uri += "&offset=" + offset;
+        urlParams.set("limit", limit);
+        if (offset) {
+          urlParams.set("offset", offset);
+        }
       }
+      uri += uri.includes("?") ? "&" : "?";
+      uri += urlParams.toString();
+
       const r = await axios.get(this._phoenix_url(uri, global), {
         headers: this._phoenix_auth_headers(),
       });
