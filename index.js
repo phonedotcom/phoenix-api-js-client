@@ -348,16 +348,11 @@ class PhoenixApiClient {
    */
   async get_list(uri, limit = 25, offset = 0, global = false, _attempt = 1) {
     try {
-      const urlParams = new URLSearchParams(uri);
-      if (limit) {
-        urlParams.set("limit", limit);
-        if (offset) {
-          urlParams.set("offset", offset);
-        }
+      if (limit && _attempt === 1) {
+        uri += uri.includes("?") ? "&" : "?";
+        uri += "limit=" + limit;
+        if (offset) uri += "&offset=" + offset;
       }
-      uri += uri.includes("?") ? "&" : "?";
-      uri += urlParams.toString();
-
       const r = await axios.get(this._phoenix_url(uri, global), {
         headers: this._phoenix_auth_headers(),
       });
