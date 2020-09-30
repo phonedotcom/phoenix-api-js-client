@@ -185,6 +185,7 @@ class PhoenixApiClient {
       handle_rate_limit: true,
       handle_server_error: 3,
       session_name: "phoenix-api-js-client-session",
+      scope: ["account-owner"],
     };
     sessionStorage.removeItem(this.options.session_name);
     if (this.listeners["logged-out"] && !session_expired)
