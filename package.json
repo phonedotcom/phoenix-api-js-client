@@ -1,6 +1,6 @@
 {
   "name": "phoenix-api-js-client",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "JavaScript Client Library for front-end applications using Phone API (api.phone.com).",
   "main": "index.js",
   "scripts": {
