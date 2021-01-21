@@ -30,6 +30,7 @@ const options = {
     handle_server_error: 3,
     scope: ["account-owner"],
     session_name: "phoenix-api-js-client-session",
+    decode_oauth_id_token: false,
 };
 
 // 3. Create client object
@@ -55,6 +56,7 @@ phoenix_client.init_user().then(authorized => {
 - ***handle_server_error***: false or unsigned integer, default: 3; Specifies the number of retries if the server responds with 500+ error (500, 501, 502 etc). Logs error in the console.  Disabling this option, it immediately throws the error.
 - ***scope***: array, default: ["account-owner"]; session name for authenticated users.
 - ***session_name***: string, default: "phoenix-api-js-client-session"; scopes for users, possible values: account-owner, extension-user, call-logs, billing-api, oauth-management.
+- ***decode_oauth_id_token***: boolean, default: false; should id_token returned from the oauth be decoded or not.
 
 ### Client methods
 

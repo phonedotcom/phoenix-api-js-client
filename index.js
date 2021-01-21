@@ -17,6 +17,7 @@ class PhoenixApiClient {
       handle_server_error: 3,
       scope: ["account-owner"],
       session_name: "phoenix-api-js-client-session",
+      decode_oauth_id_token: false,
     };
     Object.assign(this.options, options);
     this.listeners = {
@@ -52,9 +53,11 @@ class PhoenixApiClient {
         .map((v) => v.split("="));
       const hashObject = {};
       for (let i of Object.keys(hash)) {
-        hashObject[decodeURIComponent(hash[i][0])] = decodeURIComponent(
-          hash[i][1]
-        );
+        if(this.options.decode_oauth_id_token){
+          hashObject[decodeURIComponent(hash[i][0])] = decodeURIComponent(hash[i][1]);  
+        }else{
+          hashObject[hash[i][0]] = hash[i][1];  
+        }
       }
       return hashObject;
     };
