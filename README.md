@@ -30,6 +30,7 @@ const options = {
     handle_server_error: 3,
     scope: ["account-owner"],
     session_name: "phoenix-api-js-client-session",
+    id_token_sign_out: false,
 };
 
 // 3. Create client object
