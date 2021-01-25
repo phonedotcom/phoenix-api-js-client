@@ -53,8 +53,9 @@ phoenix_client.init_user().then(authorized => {
 - ***client_id*** : string,  ***required*** default null; your api account client id
 - ***handle_rate_limit***: boolean, default: true; If you send too much requests in certain period of time, it will throw 429 error. Enabling this option, this will wait for the response specified time and it will resend the same request. Logs the message in the console. Disabling this option, it immediately throws the 429 error.
 - ***handle_server_error***: false or unsigned integer, default: 3; Specifies the number of retries if the server responds with 500+ error (500, 501, 502 etc). Logs error in the console.  Disabling this option, it immediately throws the error.
-- ***scope***: array, default: ["account-owner"]; session name for authenticated users.
-- ***session_name***: string, default: "phoenix-api-js-client-session"; scopes for users, possible values: account-owner, extension-user, call-logs, billing-api, oauth-management.
+- ***scope***: array, default: ["account-owner"]; scopes for users, possible values: account-owner, extension-user, call-logs, billing-api, oauth-management, openid.
+- ***session_name***: string, default: "phoenix-api-js-client-session"; session name for authenticated users.
+- ***id_token_sign_out***: boolean, default: false; if openid scope is used, this option confirms that you want to use id_token for signing out.
 
 ### Client methods
 

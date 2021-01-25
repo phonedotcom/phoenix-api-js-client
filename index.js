@@ -10,6 +10,7 @@ class PhoenixApiClient {
     this.user = null;
     this.token = null;
     this.uses_token = false;
+    this.id_token = null;
 
     this.options = {
       client_id: null,
@@ -17,6 +18,7 @@ class PhoenixApiClient {
       handle_server_error: 3,
       scope: ["account-owner"],
       session_name: "phoenix-api-js-client-session",
+      id_token_sign_out: false,
     };
     Object.assign(this.options, options);
     this.listeners = {
@@ -56,6 +58,8 @@ class PhoenixApiClient {
           hash[i][1]
         );
       }
+      if(this.options.scope.includes('openid')) this.id_token = hashObject.id_token;
+
       return hashObject;
     };
     if (document.location.hash.includes("token_type=Bearer")) {
@@ -174,6 +178,9 @@ class PhoenixApiClient {
    */
   async sign_out(session_expired = false) {
     try {
+      if(this.options.id_token_sign_out && this.options.scope.includes('openid') && this.id_token){
+        await this.openid_endsession();
+      }
       await this.delete_access_token();
     } catch (err) {
       console.log(err);
@@ -183,6 +190,36 @@ class PhoenixApiClient {
     sessionStorage.removeItem(this.options.session_name);
     if (this.listeners["logged-out"] && !session_expired)
       this.listeners["logged-out"]();
+  }
+
+  async openid_endsession(_attempt = 1){
+    try{
+      const redirect = `${document.location.protocol}//${document.location.host}`;    
+      let uri = `https://oauth-api.phone.com/connect/endsession?`;
+      uri += `id_token_hint=${encodeURIComponent(this.id_token)}&redirect_uri=${encodeURIComponent(redirect)}`
+      await axios.get(uri, {
+        headers: this._phoenix_auth_headers(),
+      })
+    }catch(e){
+      const err = e.response;
+      if (err.status === 429 && this.options.handle_rate_limit) {
+        return await this.handle_rate_limit(err, async () => {
+          return await this.openid_endsession(_attempt);
+        });
+      }
+      if (
+        err.status >= 500 &&
+        err.status <= 599 &&
+        this.options.handle_server_error &&
+        _attempt <= this.options.handle_server_error
+      ) {
+        await this.handle_internal_server_error(err, async () => {
+          _attempt++;
+          return await this.openid_endsession(_attempt);
+        });
+      }
+      throw err;
+    }
   }
 
   /**
@@ -274,7 +311,7 @@ class PhoenixApiClient {
     const redirect = `${document.location.protocol}//${document.location.host}${redirect_path}`;
     return `https://oauth.phone.com/?client_id=${
       this.options.client_id
-    }&response_type=${is_token ? "token" : "code"}&scope=${encodeURIComponent(
+    }&response_type=${is_token ? "token" : "code"}${this.options.scope.includes("openid") ? encodeURIComponent(" id_token") : ""}&scope=${encodeURIComponent(
       this.options.scope.join(" ")
     )}&redirect_uri=${encodeURIComponent(redirect)}&state=${this._state}`;
   }
