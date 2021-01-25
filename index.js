@@ -54,11 +54,13 @@ class PhoenixApiClient {
         .map((v) => v.split("="));
       const hashObject = {};
       for (let i of Object.keys(hash)) {
+        if(hash[i][0] === "id_token" && this.options.scope.includes('openid')){
+          this.id_token = hash[i][1];
+        }
         hashObject[decodeURIComponent(hash[i][0])] = decodeURIComponent(
           hash[i][1]
         );
       }
-      if(this.options.scope.includes('openid')) this.id_token = hashObject.id_token;
 
       return hashObject;
     };
