@@ -181,9 +181,10 @@ class PhoenixApiClient {
   async sign_out(session_expired = false) {
     try {
       if(this.options.id_token_sign_out && this.options.scope.includes('openid') && this.id_token){
-        await this.openid_endsession();
+        this.openid_endsession();
+      }else{
+        await this.delete_access_token();
       }
-      await this.delete_access_token();
     } catch (err) {
       console.log(err);
     }
@@ -194,34 +195,14 @@ class PhoenixApiClient {
       this.listeners["logged-out"]();
   }
 
+  /**
+   * Goes to openid endsession route and comes back to project root route
+   */
   async openid_endsession(_attempt = 1){
-    try{
-      const redirect = `${document.location.protocol}//${document.location.host}`;    
+      const redirect = `${document.location.protocol}//${document.location.host}`;
       let uri = `https://oauth-api.phone.com/connect/endsession?`;
-      uri += `id_token_hint=${encodeURIComponent(this.id_token)}&redirect_uri=${encodeURIComponent(redirect)}`
-      await axios.get(uri, {
-        headers: this._phoenix_auth_headers(),
-      })
-    }catch(e){
-      const err = e.response;
-      if (err.status === 429 && this.options.handle_rate_limit) {
-        return await this.handle_rate_limit(err, async () => {
-          return await this.openid_endsession(_attempt);
-        });
-      }
-      if (
-        err.status >= 500 &&
-        err.status <= 599 &&
-        this.options.handle_server_error &&
-        _attempt <= this.options.handle_server_error
-      ) {
-        await this.handle_internal_server_error(err, async () => {
-          _attempt++;
-          return await this.openid_endsession(_attempt);
-        });
-      }
-      throw err;
-    }
+      uri += `id_token_hint=${encodeURIComponent(this.id_token)}&post_logout_redirect_uri=${encodeURIComponent(redirect)}`
+      window.location.href = uri;
   }
 
   /**
