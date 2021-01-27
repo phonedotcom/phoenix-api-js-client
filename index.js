@@ -202,7 +202,7 @@ class PhoenixApiClient {
       const redirect = `${document.location.protocol}//${document.location.host}`;
       let uri = `https://oauth-api.phone.com/connect/endsession?`;
       uri += `id_token_hint=${encodeURIComponent(this.id_token)}&post_logout_redirect_uri=${encodeURIComponent(redirect)}`
-      window.location.href = uri;
+      window.location.assign(uri);
   }
 
   /**
