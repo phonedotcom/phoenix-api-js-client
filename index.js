@@ -2,6 +2,7 @@ const axios = require("axios");
 
 /** Class representing a PhoenixApi client. */
 class PhoenixApiClient {
+
   /**
    * Create a PhoenixApiClient.
    * @param {object} options - objects that updates class options
@@ -11,7 +12,6 @@ class PhoenixApiClient {
     this.token = null;
     this.uses_token = false;
     this._id_token = null;
-    this._id_token_cache_key = null;
 
     this.options = {
       client_id: null,
@@ -28,25 +28,21 @@ class PhoenixApiClient {
     };
   }
 
-  set id_token(val){
+  set id_token(val) {
     this._id_token = val;
     val ? sessionStorage.setItem(this.id_token_cache_key, val) : sessionStorage.removeItem(this.id_token_cache_key);
   }
 
-  get id_token(){
-    if(this._id_token) return this._id_token;
-    if(this.user && sessionStorage.getItem(this.id_token_cache_key)){
+  get id_token() {
+    if (this._id_token) return this._id_token;
+    if (this.user && sessionStorage.getItem(this.id_token_cache_key)) {
       return sessionStorage.getItem(this.id_token_cache_key);
     }
 
     return null;
   }
 
-  set id_token_cache_key(val){
-      this._id_token_cache_key = val;
-  }
-
-  get id_token_cache_key(){
+  get id_token_cache_key() {
     return `${this.options.session_name}-id-token-${this.user.id}`;
   }
 
@@ -81,7 +77,6 @@ class PhoenixApiClient {
           hash[i][1]
         );
       }
-
       return hashObject;
     };
     if (document.location.hash.includes("token_type=Bearer")) {
@@ -92,7 +87,7 @@ class PhoenixApiClient {
       }
       this.token = `${hashObject["token_type"]} ${hashObject["access_token"]}`;
       await this._load_user(this.token);
-      if(hashObject["id_token"] && this.options.scope.includes('openid')){
+      if (hashObject["id_token"] && this.options.scope.includes('openid')) {
         this.id_token = hashObject["id_token"];
       }
       return true;
@@ -162,7 +157,7 @@ class PhoenixApiClient {
       const headers = this._phoenix_auth_headers(token);
       const response = await axios.get(
         this._phoenix_url("/oauth/access-token", true),
-        { headers: headers }
+        {headers: headers}
       );
       history.pushState(
         "",
@@ -203,9 +198,9 @@ class PhoenixApiClient {
    */
   async sign_out(session_expired = false) {
     try {
-      if(this.options.id_token_sign_out && this.options.scope.includes('openid') && this.id_token){
+      if (this.options.id_token_sign_out && this.options.scope.includes('openid') && this.id_token) {
         this.openid_endsession(session_expired);
-      }else{
+      } else {
         await this.delete_access_token();
         this.post_sign_out(session_expired);
       }
@@ -217,7 +212,7 @@ class PhoenixApiClient {
   /*
   * Cleans cache and calls logged-out callback if provided
   */
-  post_sign_out(session_expired){
+  post_sign_out(session_expired) {
     this.user = null;
     sessionStorage.removeItem(this.options.session_name);
     if (this.listeners["logged-out"] && !session_expired)
@@ -227,15 +222,15 @@ class PhoenixApiClient {
   /**
    * Goes to openid endsession route and comes back to project root route
    */
-  openid_endsession(session_expired){
-      const redirect = `${document.location.protocol}//${document.location.host}`;
-      const uri = `https://oauth-api.phone.com/connect/endsession?id_token_hint=${encodeURIComponent(this.id_token)}&post_logout_redirect_uri=${encodeURIComponent(redirect)}`;
-      this.id_token = null;
-      this.post_sign_out(session_expired);
+  openid_endsession(session_expired) {
+    const redirect = `${document.location.protocol}//${document.location.host}`;
+    const uri = `https://oauth-api.phone.com/connect/endsession?id_token_hint=${encodeURIComponent(this.id_token)}&post_logout_redirect_uri=${encodeURIComponent(redirect)}`;
+    this.id_token = null;
+    this.post_sign_out(session_expired);
 
-      window.location.assign(uri);
+    window.location.assign(uri);
 
-      return true;
+    return true;
   }
 
   /**
@@ -327,7 +322,7 @@ class PhoenixApiClient {
     const redirect = `${document.location.protocol}//${document.location.host}${redirect_path}`;
     return `https://oauth.phone.com/?client_id=${
       this.options.client_id
-    }&response_type=${is_token ? "token" : "code"}${this.options.scope.includes("openid") ? encodeURIComponent(" id_token") : ""}&scope=${encodeURIComponent(
+      }&response_type=${is_token ? "token" : "code"}${this.options.scope.includes("openid") ? encodeURIComponent(" id_token") : ""}&scope=${encodeURIComponent(
       this.options.scope.join(" ")
     )}&redirect_uri=${encodeURIComponent(redirect)}&state=${this._state}`;
   }
@@ -354,7 +349,7 @@ class PhoenixApiClient {
   _phoenix_auth_headers(token = "") {
     const token_provided = token && token.length;
     return (this.user && this.user["token"]) || token_provided
-      ? { Authorization: token_provided ? token : this.user["token"] }
+      ? {Authorization: token_provided ? token : this.user["token"]}
       : {};
   }
 
