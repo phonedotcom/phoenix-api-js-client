@@ -2,6 +2,7 @@ const axios = require("axios");
 
 /** Class representing a PhoenixApi client. */
 class PhoenixApiClient {
+
   /**
    * Create a PhoenixApiClient.
    * @param {object} options - objects that updates class options
@@ -10,6 +11,7 @@ class PhoenixApiClient {
     this.user = null;
     this.token = null;
     this.uses_token = false;
+    this._id_token = null;
 
     this.options = {
       client_id: null,
@@ -17,12 +19,31 @@ class PhoenixApiClient {
       handle_server_error: 3,
       scope: ["account-owner"],
       session_name: "phoenix-api-js-client-session",
+      id_token_sign_out: false,
     };
     Object.assign(this.options, options);
     this.listeners = {
       "logged-out": null,
       "session-expired": null,
     };
+  }
+
+  set id_token(val) {
+    this._id_token = val;
+    val ? sessionStorage.setItem(this.id_token_cache_key, val) : sessionStorage.removeItem(this.id_token_cache_key);
+  }
+
+  get id_token() {
+    if (this._id_token) return this._id_token;
+    if (this.user && sessionStorage.getItem(this.id_token_cache_key)) {
+      return sessionStorage.getItem(this.id_token_cache_key);
+    }
+
+    return null;
+  }
+
+  get id_token_cache_key() {
+    return `${this.options.session_name}-id-token-${this.user.id}`;
   }
 
   /**
@@ -66,6 +87,9 @@ class PhoenixApiClient {
       }
       this.token = `${hashObject["token_type"]} ${hashObject["access_token"]}`;
       await this._load_user(this.token);
+      if (hashObject["id_token"] && this.options.scope.includes('openid')) {
+        this.id_token = hashObject["id_token"];
+      }
       return true;
     }
     return false;
@@ -133,7 +157,7 @@ class PhoenixApiClient {
       const headers = this._phoenix_auth_headers(token);
       const response = await axios.get(
         this._phoenix_url("/oauth/access-token", true),
-        { headers: headers }
+        {headers: headers}
       );
       history.pushState(
         "",
@@ -174,15 +198,39 @@ class PhoenixApiClient {
    */
   async sign_out(session_expired = false) {
     try {
-      await this.delete_access_token();
+      if (this.options.id_token_sign_out && this.options.scope.includes('openid') && this.id_token) {
+        this.openid_endsession(session_expired);
+      } else {
+        await this.delete_access_token();
+        this.post_sign_out(session_expired);
+      }
     } catch (err) {
       console.log(err);
     }
-    sessionStorage.removeItem(this.options.session_name);
+  }
+
+  /*
+  * Cleans cache and calls logged-out callback if provided
+  */
+  post_sign_out(session_expired) {
     this.user = null;
     sessionStorage.removeItem(this.options.session_name);
     if (this.listeners["logged-out"] && !session_expired)
       this.listeners["logged-out"]();
+  }
+
+  /**
+   * Goes to openid endsession route and comes back to project root route
+   */
+  openid_endsession(session_expired) {
+    const redirect = `${document.location.protocol}//${document.location.host}`;
+    const uri = `https://oauth-api.phone.com/connect/endsession?id_token_hint=${encodeURIComponent(this.id_token)}&post_logout_redirect_uri=${encodeURIComponent(redirect)}`;
+    this.id_token = null;
+    this.post_sign_out(session_expired);
+
+    window.location.assign(uri);
+
+    return true;
   }
 
   /**
@@ -274,7 +322,7 @@ class PhoenixApiClient {
     const redirect = `${document.location.protocol}//${document.location.host}${redirect_path}`;
     return `https://oauth.phone.com/?client_id=${
       this.options.client_id
-    }&response_type=${is_token ? "token" : "code"}&scope=${encodeURIComponent(
+      }&response_type=${is_token ? "token" : "code"}${this.options.scope.includes("openid") ? encodeURIComponent(" id_token") : ""}&scope=${encodeURIComponent(
       this.options.scope.join(" ")
     )}&redirect_uri=${encodeURIComponent(redirect)}&state=${this._state}`;
   }
@@ -301,7 +349,7 @@ class PhoenixApiClient {
   _phoenix_auth_headers(token = "") {
     const token_provided = token && token.length;
     return (this.user && this.user["token"]) || token_provided
-      ? { Authorization: token_provided ? token : this.user["token"] }
+      ? {Authorization: token_provided ? token : this.user["token"]}
       : {};
   }
 
