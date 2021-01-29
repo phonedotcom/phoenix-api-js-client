@@ -10,7 +10,8 @@ class PhoenixApiClient {
     this.user = null;
     this.token = null;
     this.uses_token = false;
-    this.id_token = null;
+    this._id_token = null;
+    this._id_token_cache_key = null;
 
     this.options = {
       client_id: null,
@@ -25,6 +26,28 @@ class PhoenixApiClient {
       "logged-out": null,
       "session-expired": null,
     };
+  }
+
+  set id_token(val){
+    this._id_token = val;
+    val ? sessionStorage.setItem(this.id_token_cache_key, val) : sessionStorage.removeItem(this.id_token_cache_key);
+  }
+
+  get id_token(){
+    if(this._id_token) return this._id_token;
+    if(this.user && sessionStorage.getItem(this.id_token_cache_key)){
+      return sessionStorage.getItem(this.id_token_cache_key);
+    }
+
+    return null;
+  }
+
+  set id_token_cache_key(val){
+      this._id_token_cache_key = val;
+  }
+
+  get id_token_cache_key(){
+    return `${this.options.session_name}-id-token-${this.user.id}`;
   }
 
   /**
@@ -54,9 +77,6 @@ class PhoenixApiClient {
         .map((v) => v.split("="));
       const hashObject = {};
       for (let i of Object.keys(hash)) {
-        if(hash[i][0] === "id_token" && this.options.scope.includes('openid')){
-          this.id_token = hash[i][1];
-        }
         hashObject[decodeURIComponent(hash[i][0])] = decodeURIComponent(
           hash[i][1]
         );
@@ -72,6 +92,9 @@ class PhoenixApiClient {
       }
       this.token = `${hashObject["token_type"]} ${hashObject["access_token"]}`;
       await this._load_user(this.token);
+      if(hashObject["id_token"] && this.options.scope.includes('openid')){
+        this.id_token = hashObject["id_token"];
+      }
       return true;
     }
     return false;
@@ -181,14 +204,20 @@ class PhoenixApiClient {
   async sign_out(session_expired = false) {
     try {
       if(this.options.id_token_sign_out && this.options.scope.includes('openid') && this.id_token){
-        this.openid_endsession();
+        this.openid_endsession(session_expired);
       }else{
         await this.delete_access_token();
+        this.post_sign_out(session_expired);
       }
     } catch (err) {
       console.log(err);
     }
-    sessionStorage.removeItem(this.options.session_name);
+  }
+
+  /*
+  * Cleans cache and calls logged-out callback if provided
+  */
+  post_sign_out(session_expired){
     this.user = null;
     sessionStorage.removeItem(this.options.session_name);
     if (this.listeners["logged-out"] && !session_expired)
@@ -198,11 +227,15 @@ class PhoenixApiClient {
   /**
    * Goes to openid endsession route and comes back to project root route
    */
-  async openid_endsession(_attempt = 1){
+  openid_endsession(session_expired){
       const redirect = `${document.location.protocol}//${document.location.host}`;
-      let uri = `https://oauth-api.phone.com/connect/endsession?`;
-      uri += `id_token_hint=${encodeURIComponent(this.id_token)}&post_logout_redirect_uri=${encodeURIComponent(redirect)}`
+      const uri = `https://oauth-api.phone.com/connect/endsession?id_token_hint=${encodeURIComponent(this.id_token)}&post_logout_redirect_uri=${encodeURIComponent(redirect)}`;
+      this.id_token = null;
+      this.post_sign_out(session_expired);
+
       window.location.assign(uri);
+
+      return true;
   }
 
   /**
