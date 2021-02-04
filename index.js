@@ -109,7 +109,6 @@ class PhoenixApiClient {
           hash[i][1]
         );
       }
-
       return hashObject;
     };
     if (document.location.hash.includes("token_type=Bearer")) {
