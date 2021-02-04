@@ -4,6 +4,7 @@ const jws = require("jws");
 
 /** Class representing a PhoenixApi client. */
 class PhoenixApiClient {
+
   /**
    * Create a PhoenixApiClient.
    * @param {object} options - objects that updates class options
@@ -33,47 +34,47 @@ class PhoenixApiClient {
     };
   }
 
-  set id_token(val){
+  set id_token(val) {
     this._id_token = val;
     val ? sessionStorage.setItem(this.id_token_cache_key, val) : sessionStorage.removeItem(this.id_token_cache_key);
   }
 
-  get id_token(){
-    if(this._id_token) return this._id_token;
-    if(this.user && sessionStorage.getItem(this.id_token_cache_key)){
+  get id_token() {
+    if (this._id_token) return this._id_token;
+    if (this.user && sessionStorage.getItem(this.id_token_cache_key)) {
       return sessionStorage.getItem(this.id_token_cache_key);
     }
 
     return null;
   }
 
-  set decoded_id_token(val){
+  set decoded_id_token(val) {
     this._decoded_id_token = val;
     val ? sessionStorage.setItem(this.decoded_id_token_cache_key, JSON.stringify(val)) : sessionStorage.removeItem(this.decoded_id_token_cache_key);
   }
 
-  get decoded_id_token(){
-    if(this._decoded_id_token) return this._decoded_id_token;
-    if(this.user && sessionStorage.getItem(this.decoded_id_token_cache_key)){
+  get decoded_id_token() {
+    if (this._decoded_id_token) return this._decoded_id_token;
+    if (this.user && sessionStorage.getItem(this.decoded_id_token_cache_key)) {
       return JSON.parse(sessionStorage.getItem(this.decoded_id_token_cache_key));
     }
 
     return null;
   }
 
-  set decoded_id_token_cache_key(val){
+  set decoded_id_token_cache_key(val) {
     this._decoded_id_token_cache_key = val;
   }
 
-  get decoded_id_token_cache_key(){
+  get decoded_id_token_cache_key() {
     return `${this.id_token_cache_key}-decoded`;
   }
 
-  set id_token_cache_key(val){
-      this._id_token_cache_key = val;
+  set id_token_cache_key(val) {
+    this._id_token_cache_key = val;
   }
 
-  get id_token_cache_key(){
+  get id_token_cache_key() {
     return `${this.options.session_name}-id-token-${this.user.id}`;
   }
 
@@ -119,9 +120,9 @@ class PhoenixApiClient {
       }
       this.token = `${hashObject["token_type"]} ${hashObject["access_token"]}`;
       await this._load_user(this.token);
-      if(hashObject["id_token"] && this.options.scope.includes('openid')){
+      if (hashObject["id_token"] && this.options.scope.includes('openid')) {
         this.id_token = hashObject["id_token"];
-        if(this.options.decode_id_token) this.decoded_id_token = await this.decode_id_token();
+        if (this.options.decode_id_token) this.decoded_id_token = await this.decode_id_token();
       }
       return true;
     }
@@ -190,7 +191,7 @@ class PhoenixApiClient {
       const headers = this._phoenix_auth_headers(token);
       const response = await axios.get(
         this._phoenix_url("/oauth/access-token", true),
-        { headers: headers }
+        {headers: headers}
       );
       history.pushState(
         "",
@@ -231,9 +232,9 @@ class PhoenixApiClient {
    */
   async sign_out(session_expired = false) {
     try {
-      if(this.options.id_token_sign_out && this.options.scope.includes('openid') && this.id_token){
+      if (this.options.id_token_sign_out && this.options.scope.includes('openid') && this.id_token) {
         this.openid_endsession(session_expired);
-      }else{
+      } else {
         await this.delete_access_token();
         this.post_sign_out(session_expired);
       }
@@ -245,7 +246,7 @@ class PhoenixApiClient {
   /*
   * Cleans cache and calls logged-out callback if provided
   */
-  post_sign_out(session_expired){
+  post_sign_out(session_expired) {
     this.user = null;
     sessionStorage.removeItem(this.options.session_name);
     if (this.listeners["logged-out"] && !session_expired)
@@ -255,16 +256,16 @@ class PhoenixApiClient {
   /**
    * Goes to openid endsession route and comes back to project root route
    */
-  openid_endsession(session_expired){
-      const redirect = `${document.location.protocol}//${document.location.host}`;
-      const uri = `https://oauth-api.phone.com/connect/endsession?id_token_hint=${encodeURIComponent(this.id_token)}&post_logout_redirect_uri=${encodeURIComponent(redirect)}`;
-      this.id_token = null;
-      this.decoded_id_token = null;
-      this.post_sign_out(session_expired);
+  openid_endsession(session_expired) {
+    const redirect = `${document.location.protocol}//${document.location.host}`;
+    const uri = `https://oauth-api.phone.com/connect/endsession?id_token_hint=${encodeURIComponent(this.id_token)}&post_logout_redirect_uri=${encodeURIComponent(redirect)}`;
+    this.id_token = null;
+    this.decoded_id_token = null;
+    this.post_sign_out(session_expired);
 
-      window.location.assign(uri);
+    window.location.assign(uri);
 
-      return true;
+    return true;
   }
 
   /**
@@ -356,7 +357,7 @@ class PhoenixApiClient {
     const redirect = `${document.location.protocol}//${document.location.host}${redirect_path}`;
     return `https://oauth.phone.com/?client_id=${
       this.options.client_id
-    }&response_type=${is_token ? "token" : "code"}${this.options.scope.includes("openid") ? encodeURIComponent(" id_token") : ""}&scope=${encodeURIComponent(
+      }&response_type=${is_token ? "token" : "code"}${this.options.scope.includes("openid") ? encodeURIComponent(" id_token") : ""}&scope=${encodeURIComponent(
       this.options.scope.join(" ")
     )}&redirect_uri=${encodeURIComponent(redirect)}&state=${this._state}`;
   }
@@ -369,7 +370,6 @@ class PhoenixApiClient {
    */
   _phoenix_url(uri, global = false) {
     let url = "https://api.phone.com/v4";
-    
     if (!global) {
       url += `/accounts/${this.user["id"]}`;
     }
@@ -384,7 +384,7 @@ class PhoenixApiClient {
   _phoenix_auth_headers(token = "") {
     const token_provided = token && token.length;
     return (this.user && this.user["token"]) || token_provided
-      ? { Authorization: token_provided ? token : this.user["token"] }
+      ? {Authorization: token_provided ? token : this.user["token"]}
       : {};
   }
 
@@ -674,33 +674,33 @@ class PhoenixApiClient {
     Decodes id token, validates the signature
    * @return {object} token payload or null.
    */
-  async decode_id_token(){
-    if(!this.id_token){
+  async decode_id_token() {
+    if (!this.id_token) {
       console.warn('id_token not found');
       return null;
     }
-    try{
+    try {
       const tokenparts = this.id_token.split('.');
       const header = JSON.parse(atob(tokenparts[0]));
       const payload = JSON.parse(atob(tokenparts[1]));
-      
+
       const configuration = await axios.get(`${payload.iss}/.well-known/openid-configuration/`);
       const keys = await axios.get(configuration.data.keys);
-      
+
       const alg = header.alg;
       const key = keys.data.keys.find(x => x.alg === alg);
-      
-      if(key){
-        if (!jws.verify(this.id_token, alg, jwkToPem(key))){
+
+      if (key) {
+        if (!jws.verify(this.id_token, alg, jwkToPem(key))) {
           console.warn('Your id_token could not be validated.')
           return null
-        } 
+        }
         return payload;
-      }else{
+      } else {
         console.warn('Matching key could not be found.');
         return null;
       }
-    }catch(err){
+    } catch (err) {
       console.warn('Error decoding your ID token.');
       return null;
     }
