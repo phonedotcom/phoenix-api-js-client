@@ -31,6 +31,7 @@ const options = {
     scope: ["account-owner"],
     session_name: "phoenix-api-js-client-session",
     id_token_sign_out: false,
+    decode_id_token: false,
 };
 
 // 3. Create client object
@@ -57,6 +58,7 @@ phoenix_client.init_user().then(authorized => {
 - ***scope***: array, default: ["account-owner"]; scopes for users, possible values: account-owner, extension-user, call-logs, billing-api, oauth-management, openid.
 - ***session_name***: string, default: "phoenix-api-js-client-session"; session name for authenticated users.
 - ***id_token_sign_out***: boolean, default: false; if openid scope is used, this option confirms that you want to use id_token for signing out.
+- ***decode_id_token***: boolean, default: false; if openid scope is used, this option enabled will decode your id_token and validate its signature. As result it will return id_token's payload or null.
 
 ### Client methods
 

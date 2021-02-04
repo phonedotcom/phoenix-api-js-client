@@ -1,4 +1,6 @@
 const axios = require("axios");
+const jwkToPem = require("jwk-to-pem");
+const jws = require("jws");
 
 /** Class representing a PhoenixApi client. */
 class PhoenixApiClient {
@@ -12,6 +14,7 @@ class PhoenixApiClient {
     this.token = null;
     this.uses_token = false;
     this._id_token = null;
+    this._decoded_id_token = null;
 
     this.options = {
       client_id: null,
@@ -20,6 +23,7 @@ class PhoenixApiClient {
       scope: ["account-owner"],
       session_name: "phoenix-api-js-client-session",
       id_token_sign_out: false,
+      decode_id_token: false,
     };
     Object.assign(this.options, options);
     this.listeners = {
@@ -40,6 +44,24 @@ class PhoenixApiClient {
     }
 
     return null;
+  }
+
+  set decoded_id_token(val) {
+    this._decoded_id_token = val;
+    val ? sessionStorage.setItem(this.decoded_id_token_cache_key, JSON.stringify(val)) : sessionStorage.removeItem(this.decoded_id_token_cache_key);
+  }
+
+  get decoded_id_token() {
+    if (this._decoded_id_token) return this._decoded_id_token;
+    if (this.user && sessionStorage.getItem(this.decoded_id_token_cache_key)) {
+      return JSON.parse(sessionStorage.getItem(this.decoded_id_token_cache_key));
+    }
+
+    return null;
+  }
+
+  get decoded_id_token_cache_key() {
+    return `${this.id_token_cache_key}-decoded`;
   }
 
   get id_token_cache_key() {
@@ -89,6 +111,7 @@ class PhoenixApiClient {
       await this._load_user(this.token);
       if (hashObject["id_token"] && this.options.scope.includes('openid')) {
         this.id_token = hashObject["id_token"];
+        if (this.options.decode_id_token) this.decoded_id_token = await this.decode_id_token();
       }
       return true;
     }
@@ -226,6 +249,7 @@ class PhoenixApiClient {
     const redirect = `${document.location.protocol}//${document.location.host}`;
     const uri = `https://oauth-api.phone.com/connect/endsession?id_token_hint=${encodeURIComponent(this.id_token)}&post_logout_redirect_uri=${encodeURIComponent(redirect)}`;
     this.id_token = null;
+    this.decoded_id_token = null;
     this.post_sign_out(session_expired);
 
     window.location.assign(uri);
@@ -632,6 +656,42 @@ class PhoenixApiClient {
         });
       }
       throw err;
+    }
+  }
+
+  /*
+    Decodes id token, validates the signature
+   * @return {object} token payload or null.
+   */
+  async decode_id_token() {
+    if (!this.id_token) {
+      console.warn('id_token not found');
+      return null;
+    }
+    try {
+      const tokenparts = this.id_token.split('.');
+      const header = JSON.parse(atob(tokenparts[0]));
+      const payload = JSON.parse(atob(tokenparts[1]));
+
+      const configuration = await axios.get(`${payload.iss}/.well-known/openid-configuration/`);
+      const keys = await axios.get(configuration.data.keys);
+
+      const alg = header.alg;
+      const key = keys.data.keys.find(x => x.alg === alg);
+
+      if (key) {
+        if (!jws.verify(this.id_token, alg, jwkToPem(key))) {
+          console.warn('Your id_token could not be validated.')
+          return null
+        }
+        return payload;
+      } else {
+        console.warn('Matching key could not be found.');
+        return null;
+      }
+    } catch (err) {
+      console.warn('Error decoding your ID token.');
+      return null;
     }
   }
 }
