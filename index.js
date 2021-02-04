@@ -14,9 +14,7 @@ class PhoenixApiClient {
     this.token = null;
     this.uses_token = false;
     this._id_token = null;
-    this._id_token_cache_key = null;
     this._decoded_id_token = null;
-    this._decoded_id_token_cache_key = null;
 
     this.options = {
       client_id: null,
@@ -62,16 +60,8 @@ class PhoenixApiClient {
     return null;
   }
 
-  set decoded_id_token_cache_key(val) {
-    this._decoded_id_token_cache_key = val;
-  }
-
   get decoded_id_token_cache_key() {
     return `${this.id_token_cache_key}-decoded`;
-  }
-
-  set id_token_cache_key(val) {
-    this._id_token_cache_key = val;
   }
 
   get id_token_cache_key() {
