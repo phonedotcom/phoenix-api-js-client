@@ -121,7 +121,7 @@ class PhoenixApiClient {
       await this._load_user(this.token);
       if(hashObject["id_token"] && this.options.scope.includes('openid')){
         this.id_token = hashObject["id_token"];
-        if(this.options.decode_id_token) this.dedoded_id_token = await this.decode_id_token();
+        if(this.options.decode_id_token) this.decoded_id_token = await this.decode_id_token();
       }
       return true;
     }
