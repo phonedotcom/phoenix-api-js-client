@@ -24,6 +24,7 @@ class PhoenixApiClient {
       session_name: "phoenix-api-js-client-session",
       id_token_sign_out: false,
       decode_id_token: false,
+      ignore_state: false,
     };
     Object.assign(this.options, options);
     this.listeners = {
@@ -103,7 +104,7 @@ class PhoenixApiClient {
     };
     if (document.location.hash.includes("token_type=Bearer")) {
       const hashObject = parse_query(document.location.hash);
-      if (this._state !== hashObject["state"]) {
+      if (!this.options.ignore_state && this._state !== hashObject["state"]) {
         console.warn('"state" parameter doesn\'t match');
         return false;
       }
@@ -348,7 +349,7 @@ class PhoenixApiClient {
       this.options.client_id
       }&response_type=${is_token ? "token" : "code"}${this.options.scope.includes("openid") ? encodeURIComponent(" id_token") : ""}&scope=${encodeURIComponent(
       this.options.scope.join(" ")
-    )}&redirect_uri=${encodeURIComponent(redirect)}&state=${this._state}`;
+    )}&redirect_uri=${encodeURIComponent(redirect)}${this.options.ignore_state ? '' : '&state='+this._state}`;
   }
 
   /**
