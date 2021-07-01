@@ -178,11 +178,7 @@ class PhoenixApiClient {
   async _load_user(token, uses_token = false, _attempt = 1) {
     try {
       this.uses_token = uses_token;
-      const headers = this._phoenix_auth_headers(token);
-      const response = await axios.get(
-        this._phoenix_url("/oauth/access-token", true),
-        {headers: headers}
-      );
+      const response = await this.call_api('get', "/v4/oauth/access-token", null, true, token);
       history.pushState(
         "",
         document.title,
@@ -266,13 +262,7 @@ class PhoenixApiClient {
   async delete_access_token(_attempt = 1) {
     try {
       if (this.uses_token) return true;
-
-      const item = await axios.delete(
-        this._phoenix_url("/oauth/access-token", true),
-        {
-          headers: this._phoenix_auth_headers(),
-        }
-      );
+      const item = await this.call_api('delete', "/v4/oauth/access-token", null, true);
       return item.data;
     } catch (e) {
       const err = e.response;
@@ -359,9 +349,9 @@ class PhoenixApiClient {
    * @return {string} generated url
    */
   _phoenix_url(uri, global = false) {
-    let url = "https://api.phone.com/v4";
+    let url = "https://api.phone.com";
     if (!global) {
-      url += `/accounts/${this.user["id"]}`;
+      url += `/v4/accounts/${this.user["id"]}`;
     }
     return `${url}${uri}`;
   }
@@ -420,9 +410,7 @@ class PhoenixApiClient {
         uri += "limit=" + limit;
         if (offset) uri += "&offset=" + offset;
       }
-      const r = await axios.get(this._phoenix_url(uri, global), {
-        headers: this._phoenix_auth_headers(),
-      });
+      const r = await this.call_api('get', global ? ('/v4' + uri) : uri, null, global);
       return {
         items: r.data["items"],
         offset: r.data["offset"],
@@ -459,9 +447,7 @@ class PhoenixApiClient {
    */
   async get_item(uri, _attempt = 1) {
     try {
-      const item = await axios.get(this._phoenix_url(uri), {
-        headers: this._phoenix_auth_headers(),
-      });
+      const item = await this.call_api('get', uri);
       return item.data;
     } catch (e) {
       const err = e.response;
@@ -493,9 +479,7 @@ class PhoenixApiClient {
    */
   async delete_item(uri, _attempt = 1) {
     try {
-      const item = await axios.delete(this._phoenix_url(uri), {
-        headers: this._phoenix_auth_headers(),
-      });
+      const item = await this.call_api('delete', uri);
       return item.data;
     } catch (e) {
       const err = e.response;
@@ -527,10 +511,9 @@ class PhoenixApiClient {
    */
   async download_item(uri, _attempt = 1) {
     try {
-      const item = await axios.get(this._phoenix_url(uri), {
+      const item = await this.call_api('get', uri, null, false, {
         responseType: "blob",
-        timeout: 30000,
-        headers: this._phoenix_auth_headers(),
+        timeout: 30000
       });
       return item.data;
     } catch (e) {
@@ -564,9 +547,7 @@ class PhoenixApiClient {
    */
   async replace_item(uri, data, _attempt = 1) {
     try {
-      const item = await axios.put(this._phoenix_url(uri), data, {
-        headers: this._phoenix_auth_headers(),
-      });
+      const item = await this.call_api('put', uri, data);
       return item.data;
     } catch (e) {
       const err = e.response;
@@ -599,9 +580,7 @@ class PhoenixApiClient {
    */
   async patch_item(uri, data, _attempt = 1) {
     try {
-      const item = await axios.patch(this._phoenix_url(uri), data, {
-        headers: this._phoenix_auth_headers(),
-      });
+      const item = await this.call_api('patch', uri, data);
       return item.data;
     } catch (e) {
       const err = e.response;
@@ -634,9 +613,7 @@ class PhoenixApiClient {
    */
   async create_item(uri, data, _attempt = 1) {
     try {
-      const item = await axios.post(this._phoenix_url(uri), data, {
-        headers: this._phoenix_auth_headers(),
-      });
+      const item = await this.call_api('post', uri, data);
       return item.data;
     } catch (e) {
       const err = e.response;
@@ -660,8 +637,8 @@ class PhoenixApiClient {
     }
   }
 
-  /*
-    Decodes id token, validates the signature
+  /**
+   * Decodes id token, validates the signature
    * @return {object} token payload or null.
    */
   async decode_id_token() {
@@ -695,6 +672,30 @@ class PhoenixApiClient {
       return null;
     }
   }
+
+  /**
+   * Method for making custom API call
+   * @param method
+   * @param uri
+   * @param body
+   * @param is_uri_global
+   * @param options
+   * @param token
+   * @return {Promise<*>}
+   */
+  async call_api(method, uri, body = null, is_uri_global = false, options = {}, token = '') {
+    const method_lc = method.toLowerCase();
+    const url = this._phoenix_url(uri, is_uri_global);
+    const headers = token.length ? this._phoenix_auth_headers(token) : this._phoenix_auth_headers();
+    const options_a = {headers, ...options};
+    if (method_lc === 'get') {
+      return await axios.get(url, options_a);
+    } else {
+      console.log(options_a);
+      return await axios[method_lc](url, body || '', options_a);
+    }
+  }
+
 }
 
 module.exports = PhoenixApiClient;
