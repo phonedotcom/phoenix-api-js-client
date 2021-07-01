@@ -178,7 +178,7 @@ class PhoenixApiClient {
   async _load_user(token, uses_token = false, _attempt = 1) {
     try {
       this.uses_token = uses_token;
-      const response = await this.call_api('get', "/v4/oauth/access-token", null, true, token);
+      const response = await this.call_api('get', "/v4/oauth/access-token", null, true, {}, token);
       history.pushState(
         "",
         document.title,
