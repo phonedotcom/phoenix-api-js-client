@@ -691,7 +691,6 @@ class PhoenixApiClient {
     if (method_lc === 'get') {
       return await axios.get(url, options_a);
     } else {
-      console.log(options_a);
       return await axios[method_lc](url, body || '', options_a);
     }
   }
