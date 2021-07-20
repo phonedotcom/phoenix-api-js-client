@@ -690,6 +690,8 @@ class PhoenixApiClient {
     const options_a = {headers, ...options};
     if (method_lc === 'get') {
       return await axios.get(url, options_a);
+    } else if (method_lc === 'delete') {
+      return await axios[method_lc](url, options_a); 
     } else {
       return await axios[method_lc](url, body || '', options_a);
     }
