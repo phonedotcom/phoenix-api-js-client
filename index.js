@@ -25,7 +25,9 @@ class PhoenixApiClient {
       id_token_sign_out: false,
       decode_id_token: false,
       ignore_state: false,
+      storage: 'session',
     };
+    if (!['session', 'local'].includes(options.storage)) options.storage = 'session';
     Object.assign(this.options, options);
     this.listeners = {
       "logged-out": null,
@@ -35,13 +37,13 @@ class PhoenixApiClient {
 
   set id_token(val) {
     this._id_token = val;
-    val ? sessionStorage.setItem(this.id_token_cache_key, val) : sessionStorage.removeItem(this.id_token_cache_key);
+    val ? this._setItem(this.id_token_cache_key, val) : this._removeItem(this.id_token_cache_key);
   }
 
   get id_token() {
     if (this._id_token) return this._id_token;
-    if (this.user && sessionStorage.getItem(this.id_token_cache_key)) {
-      return sessionStorage.getItem(this.id_token_cache_key);
+    if (this.user && this._getItem(this.id_token_cache_key)) {
+      return this._getItem(this.id_token_cache_key);
     }
 
     return null;
@@ -49,13 +51,13 @@ class PhoenixApiClient {
 
   set decoded_id_token(val) {
     this._decoded_id_token = val;
-    val ? sessionStorage.setItem(this.decoded_id_token_cache_key, JSON.stringify(val)) : sessionStorage.removeItem(this.decoded_id_token_cache_key);
+    val ? this._setItem(this.decoded_id_token_cache_key, JSON.stringify(val)) : this._removeItem(this.decoded_id_token_cache_key);
   }
 
   get decoded_id_token() {
     if (this._decoded_id_token) return this._decoded_id_token;
-    if (this.user && sessionStorage.getItem(this.decoded_id_token_cache_key)) {
-      return JSON.parse(sessionStorage.getItem(this.decoded_id_token_cache_key));
+    if (this.user && this._getItem(this.decoded_id_token_cache_key)) {
+      return JSON.parse(this._getItem(this.decoded_id_token_cache_key));
     }
 
     return null;
@@ -74,7 +76,7 @@ class PhoenixApiClient {
    * @return {Promise<boolean>}
    */
   async init_user() {
-    let user = sessionStorage.getItem(this.options.session_name);
+    let user = this._getItem(this.options.session_name);
     if (user) user = JSON.parse(user);
     if (!(user && (await this.set_user(user)))) {
       await this._oauth();
@@ -234,7 +236,7 @@ class PhoenixApiClient {
   */
   post_sign_out(session_expired) {
     this.user = null;
-    sessionStorage.removeItem(this.options.session_name);
+    this._removeItem(this.options.session_name);
     if (this.listeners["logged-out"] && !session_expired)
       this.listeners["logged-out"]();
   }
@@ -309,7 +311,7 @@ class PhoenixApiClient {
       if (timeout < 0) {
         await this.handle_expired_session();
       } else {
-        sessionStorage.setItem(
+        this._setItem(
           this.options.session_name,
           JSON.stringify(user, null, 2)
         );
@@ -695,6 +697,49 @@ class PhoenixApiClient {
     } else {
       return await axios[method_lc](url, body || '', options_a);
     }
+  }
+
+  /**
+   * Method for storing in session/local storage based on this.option.storage value
+   * @param {string} key
+   * @param {string} value
+   * @return {boolean} true
+   */
+  _setItem(key, value) {
+    if (this.options.storage === 'session') {
+      sessionStorage.setItem(key, value);
+    } else {
+      localStorage.setItem(key, value);
+    }
+
+    return true;
+  }
+
+  /**
+   * Method for retrieving from session/local storage based on this.option.storage value
+   * @param {string} key
+   * @return {string} retrieved value
+   */
+  _getItem(key) {
+    if (this.options.storage === 'session') {
+      return sessionStorage.getItem(key);
+    }
+    return localStorage.getItem(key); 
+  }
+
+  /**
+   * Method for removing from session/local storage based on this.option.storage value
+   * @param {string} key
+   * @return {boolean} true
+   */
+  _removeItem(key) {
+    if (this.options.storage === 'session') {
+      sessionStorage.removeItem(key);
+    } else {
+      localStorage.removeItem(key);
+    }
+
+    return true;
   }
 
 }
