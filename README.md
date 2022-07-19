@@ -32,7 +32,7 @@ const options = {
     session_name: "phoenix-api-js-client-session",
     id_token_sign_out: false,
     decode_id_token: false,
-    scope: 'tab',
+    local_scope: 'tab',
 };
 
 // 3. Create client object
@@ -60,7 +60,7 @@ phoenix_client.init_user().then(authorized => {
 - ***session_name***: string, default: "phoenix-api-js-client-session"; session name for authenticated users.
 - ***id_token_sign_out***: boolean, default: false; if openid scope is used, this option confirms that you want to use id_token for signing out.
 - ***decode_id_token***: boolean, default: false; if openid scope is used, this option enabled will decode your id_token and validate its signature. As result it will return id_token's payload or null.
-- ***scope***: string, in: ['tab', 'browser'], default: 'tab'; defines how data is stored, 'tab' - uses sessionStorage (phoenix-api-js-client is available per tab), 'browser' - uses localStorage (phoenix-api-js-client data is shared across browser windows and tabs).
+- ***local_scope***: string, in: ['tab', 'browser'], default: 'tab'; defines how data is stored, 'tab' - uses sessionStorage (phoenix-api-js-client is available per tab), 'browser' - uses localStorage (phoenix-api-js-client data is shared across browser windows and tabs).
 
 ### Client methods
 

@@ -25,9 +25,9 @@ class PhoenixApiClient {
       id_token_sign_out: false,
       decode_id_token: false,
       ignore_state: false,
-      scope: 'tab',
+      local_scope: 'tab',
     };
-    if (!['tab', 'browser'].includes(options.scope)) options.scope = 'tab';
+    if (!['tab', 'browser'].includes(options.local_scope)) options.local_scope = 'tab';
     Object.assign(this.options, options);
     this.listeners = {
       "logged-out": null,
@@ -700,13 +700,13 @@ class PhoenixApiClient {
   }
 
   /**
-   * Method for storing in session/local storage based on this.options.scope value
+   * Method for storing in session/local storage based on this.options.local_scope value
    * @param {string} key
    * @param {string} value
    * @return {boolean} true
    */
   _setItem(key, value) {
-    if (this.options.scope === 'tab') {
+    if (this.options.local_scope === 'tab') {
       sessionStorage.setItem(key, value);
     } else {
       localStorage.setItem(key, value);
@@ -716,24 +716,24 @@ class PhoenixApiClient {
   }
 
   /**
-   * Method for retrieving from session/local storage based on this.options.scope value
+   * Method for retrieving from session/local storage based on this.options.local_scope value
    * @param {string} key
    * @return {string} retrieved value
    */
   _getItem(key) {
-    if (this.options.scope === 'tab') {
+    if (this.options.local_scope === 'tab') {
       return sessionStorage.getItem(key);
     }
     return localStorage.getItem(key); 
   }
 
   /**
-   * Method for removing from session/local storage based on this.options.scope value
+   * Method for removing from session/local storage based on this.options.local_scope value
    * @param {string} key
    * @return {boolean} true
    */
   _removeItem(key) {
-    if (this.options.scope === 'tab') {
+    if (this.options.local_scope === 'tab') {
       sessionStorage.removeItem(key);
     } else {
       localStorage.removeItem(key);
