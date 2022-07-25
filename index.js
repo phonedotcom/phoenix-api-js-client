@@ -1,4 +1,6 @@
 const axios = require("axios");
+const jwkToPem = require("jwk-to-pem");
+const jws = require("jws");
 
 /** Class representing a PhoenixApi client. */
 class PhoenixApiClient {
@@ -12,6 +14,7 @@ class PhoenixApiClient {
     this.token = null;
     this.uses_token = false;
     this._id_token = null;
+    this._decoded_id_token = null;
 
     this.options = {
       client_id: null,
@@ -20,7 +23,11 @@ class PhoenixApiClient {
       scope: ["account-owner"],
       session_name: "phoenix-api-js-client-session",
       id_token_sign_out: false,
+      decode_id_token: false,
+      ignore_state: false,
+      session_scope: "tab",
     };
+    if (!["tab", "browser"].includes(options.session_scope)) options.session_scope = "tab";
     Object.assign(this.options, options);
     this.listeners = {
       "logged-out": null,
@@ -30,16 +37,34 @@ class PhoenixApiClient {
 
   set id_token(val) {
     this._id_token = val;
-    val ? sessionStorage.setItem(this.id_token_cache_key, val) : sessionStorage.removeItem(this.id_token_cache_key);
+    val ? this._setItem(this.id_token_cache_key, val) : this._removeItem(this.id_token_cache_key);
   }
 
   get id_token() {
     if (this._id_token) return this._id_token;
-    if (this.user && sessionStorage.getItem(this.id_token_cache_key)) {
-      return sessionStorage.getItem(this.id_token_cache_key);
+    if (this.user && this._getItem(this.id_token_cache_key)) {
+      return this._getItem(this.id_token_cache_key);
     }
 
     return null;
+  }
+
+  set decoded_id_token(val) {
+    this._decoded_id_token = val;
+    val ? this._setItem(this.decoded_id_token_cache_key, JSON.stringify(val)) : this._removeItem(this.decoded_id_token_cache_key);
+  }
+
+  get decoded_id_token() {
+    if (this._decoded_id_token) return this._decoded_id_token;
+    if (this.user && this._getItem(this.decoded_id_token_cache_key)) {
+      return JSON.parse(this._getItem(this.decoded_id_token_cache_key));
+    }
+
+    return null;
+  }
+
+  get decoded_id_token_cache_key() {
+    return `${this.id_token_cache_key}-decoded`;
   }
 
   get id_token_cache_key() {
@@ -51,7 +76,7 @@ class PhoenixApiClient {
    * @return {Promise<boolean>}
    */
   async init_user() {
-    let user = sessionStorage.getItem(this.options.session_name);
+    let user = this._getItem(this.options.session_name);
     if (user) user = JSON.parse(user);
     if (!(user && (await this.set_user(user)))) {
       await this._oauth();
@@ -81,7 +106,7 @@ class PhoenixApiClient {
     };
     if (document.location.hash.includes("token_type=Bearer")) {
       const hashObject = parse_query(document.location.hash);
-      if (this._state !== hashObject["state"]) {
+      if (!this.options.ignore_state && this._state !== hashObject["state"]) {
         console.warn('"state" parameter doesn\'t match');
         return false;
       }
@@ -89,6 +114,7 @@ class PhoenixApiClient {
       await this._load_user(this.token);
       if (hashObject["id_token"] && this.options.scope.includes('openid')) {
         this.id_token = hashObject["id_token"];
+        if (this.options.decode_id_token) this.decoded_id_token = await this.decode_id_token();
       }
       return true;
     }
@@ -154,11 +180,7 @@ class PhoenixApiClient {
   async _load_user(token, uses_token = false, _attempt = 1) {
     try {
       this.uses_token = uses_token;
-      const headers = this._phoenix_auth_headers(token);
-      const response = await axios.get(
-        this._phoenix_url("/oauth/access-token", true),
-        {headers: headers}
-      );
+      const response = await this.call_api('get', "/v4/oauth/access-token", null, true, {}, token);
       history.pushState(
         "",
         document.title,
@@ -214,7 +236,7 @@ class PhoenixApiClient {
   */
   post_sign_out(session_expired) {
     this.user = null;
-    sessionStorage.removeItem(this.options.session_name);
+    this._removeItem(this.options.session_name);
     if (this.listeners["logged-out"] && !session_expired)
       this.listeners["logged-out"]();
   }
@@ -226,6 +248,7 @@ class PhoenixApiClient {
     const redirect = `${document.location.protocol}//${document.location.host}`;
     const uri = `https://oauth-api.phone.com/connect/endsession?id_token_hint=${encodeURIComponent(this.id_token)}&post_logout_redirect_uri=${encodeURIComponent(redirect)}`;
     this.id_token = null;
+    this.decoded_id_token = null;
     this.post_sign_out(session_expired);
 
     window.location.assign(uri);
@@ -241,13 +264,7 @@ class PhoenixApiClient {
   async delete_access_token(_attempt = 1) {
     try {
       if (this.uses_token) return true;
-
-      const item = await axios.delete(
-        this._phoenix_url("/oauth/access-token", true),
-        {
-          headers: this._phoenix_auth_headers(),
-        }
-      );
+      const item = await this.call_api('delete', "/v4/oauth/access-token", null, true);
       return item.data;
     } catch (e) {
       const err = e.response;
@@ -294,7 +311,7 @@ class PhoenixApiClient {
       if (timeout < 0) {
         await this.handle_expired_session();
       } else {
-        sessionStorage.setItem(
+        this._setItem(
           this.options.session_name,
           JSON.stringify(user, null, 2)
         );
@@ -324,7 +341,7 @@ class PhoenixApiClient {
       this.options.client_id
       }&response_type=${is_token ? "token" : "code"}${this.options.scope.includes("openid") ? encodeURIComponent(" id_token") : ""}&scope=${encodeURIComponent(
       this.options.scope.join(" ")
-    )}&redirect_uri=${encodeURIComponent(redirect)}&state=${this._state}`;
+    )}&redirect_uri=${encodeURIComponent(redirect)}${this.options.ignore_state ? '' : '&state='+this._state}`;
   }
 
   /**
@@ -334,9 +351,9 @@ class PhoenixApiClient {
    * @return {string} generated url
    */
   _phoenix_url(uri, global = false) {
-    let url = "https://api.phone.com/v4";
+    let url = "https://api.phone.com";
     if (!global) {
-      url += `/accounts/${this.user["id"]}`;
+      url += `/v4/accounts/${this.user["id"]}`;
     }
     return `${url}${uri}`;
   }
@@ -395,9 +412,7 @@ class PhoenixApiClient {
         uri += "limit=" + limit;
         if (offset) uri += "&offset=" + offset;
       }
-      const r = await axios.get(this._phoenix_url(uri, global), {
-        headers: this._phoenix_auth_headers(),
-      });
+      const r = await this.call_api('get', global ? ('/v4' + uri) : uri, null, global);
       return {
         items: r.data["items"],
         offset: r.data["offset"],
@@ -434,9 +449,7 @@ class PhoenixApiClient {
    */
   async get_item(uri, _attempt = 1) {
     try {
-      const item = await axios.get(this._phoenix_url(uri), {
-        headers: this._phoenix_auth_headers(),
-      });
+      const item = await this.call_api('get', uri);
       return item.data;
     } catch (e) {
       const err = e.response;
@@ -468,9 +481,7 @@ class PhoenixApiClient {
    */
   async delete_item(uri, _attempt = 1) {
     try {
-      const item = await axios.delete(this._phoenix_url(uri), {
-        headers: this._phoenix_auth_headers(),
-      });
+      const item = await this.call_api('delete', uri);
       return item.data;
     } catch (e) {
       const err = e.response;
@@ -502,10 +513,9 @@ class PhoenixApiClient {
    */
   async download_item(uri, _attempt = 1) {
     try {
-      const item = await axios.get(this._phoenix_url(uri), {
+      const item = await this.call_api('get', uri, null, false, {
         responseType: "blob",
-        timeout: 30000,
-        headers: this._phoenix_auth_headers(),
+        timeout: 30000
       });
       return item.data;
     } catch (e) {
@@ -539,9 +549,7 @@ class PhoenixApiClient {
    */
   async replace_item(uri, data, _attempt = 1) {
     try {
-      const item = await axios.put(this._phoenix_url(uri), data, {
-        headers: this._phoenix_auth_headers(),
-      });
+      const item = await this.call_api('put', uri, data);
       return item.data;
     } catch (e) {
       const err = e.response;
@@ -574,9 +582,7 @@ class PhoenixApiClient {
    */
   async patch_item(uri, data, _attempt = 1) {
     try {
-      const item = await axios.patch(this._phoenix_url(uri), data, {
-        headers: this._phoenix_auth_headers(),
-      });
+      const item = await this.call_api('patch', uri, data);
       return item.data;
     } catch (e) {
       const err = e.response;
@@ -609,9 +615,7 @@ class PhoenixApiClient {
    */
   async create_item(uri, data, _attempt = 1) {
     try {
-      const item = await axios.post(this._phoenix_url(uri), data, {
-        headers: this._phoenix_auth_headers(),
-      });
+      const item = await this.call_api('post', uri, data);
       return item.data;
     } catch (e) {
       const err = e.response;
@@ -634,6 +638,110 @@ class PhoenixApiClient {
       throw err;
     }
   }
+
+  /**
+   * Decodes id token, validates the signature
+   * @return {object} token payload or null.
+   */
+  async decode_id_token() {
+    if (!this.id_token) {
+      console.warn('id_token not found');
+      return null;
+    }
+    try {
+      const tokenparts = this.id_token.split('.');
+      const header = JSON.parse(atob(tokenparts[0]));
+      const payload = JSON.parse(atob(tokenparts[1]));
+
+      const configuration = await axios.get(`${payload.iss}/.well-known/openid-configuration/`);
+      const keys = await axios.get(configuration.data.keys);
+
+      const alg = header.alg;
+      const key = keys.data.keys.find(x => x.alg === alg);
+
+      if (key) {
+        if (!jws.verify(this.id_token, alg, jwkToPem(key))) {
+          console.warn('Your id_token could not be validated.')
+          return null
+        }
+        return payload;
+      } else {
+        console.warn('Matching key could not be found.');
+        return null;
+      }
+    } catch (err) {
+      console.warn('Error decoding your ID token.');
+      return null;
+    }
+  }
+
+  /**
+   * Method for making custom API call
+   * @param method
+   * @param uri
+   * @param body
+   * @param is_uri_global
+   * @param options
+   * @param token
+   * @return {Promise<*>}
+   */
+  async call_api(method, uri, body = null, is_uri_global = false, options = {}, token = '') {
+    const method_lc = method.toLowerCase();
+    const url = this._phoenix_url(uri, is_uri_global);
+    const headers = token.length ? this._phoenix_auth_headers(token) : this._phoenix_auth_headers();
+    const options_a = {headers, ...options};
+    if (method_lc === 'get') {
+      return await axios.get(url, options_a);
+    } else if (method_lc === 'delete') {
+      return await axios[method_lc](url, options_a); 
+    } else {
+      return await axios[method_lc](url, body || '', options_a);
+    }
+  }
+
+  /**
+   * Method for storing in session/local storage based on this.options.session_scope value
+   * @param {string} key
+   * @param {string} value
+   * @return {boolean} true
+   */
+  _setItem(key, value) {
+    if (this.options.session_scope === 'tab') {
+      sessionStorage.setItem(key, value);
+    } else {
+      localStorage.setItem(key, value);
+    }
+
+    return true;
+  }
+
+  /**
+   * Method for retrieving from session/local storage based on this.options.session_scope value
+   * @param {string} key
+   * @return {string} retrieved value
+   */
+  _getItem(key) {
+    if (this.options.session_scope === 'tab') {
+      return sessionStorage.getItem(key);
+    }
+    return localStorage.getItem(key); 
+  }
+
+  /**
+   * Method for removing from session/local storage based on this.options.session_scope value
+   * @param {string} key
+   * @return {boolean} true
+   */
+  _removeItem(key) {
+    if (this.options.session_scope === 'tab') {
+      sessionStorage.removeItem(key);
+    } else {
+      localStorage.removeItem(key);
+    }
+
+    return true;
+  }
+
 }
 
 module.exports = PhoenixApiClient;
