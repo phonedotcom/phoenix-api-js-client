@@ -25,9 +25,9 @@ class PhoenixApiClient {
       id_token_sign_out: false,
       decode_id_token: false,
       ignore_state: false,
-      session_scope: 'tab',
+      session_scope: "tab",
     };
-    if (!['tab', 'browser'].includes(options.session_scope)) options.session_scope = 'tab';
+    if (!["tab", "browser"].includes(options.session_scope)) options.session_scope = "tab";
     Object.assign(this.options, options);
     this.listeners = {
       "logged-out": null,
