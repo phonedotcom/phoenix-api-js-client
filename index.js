@@ -337,7 +337,7 @@ class PhoenixApiClient {
    */
   _get_oauth_url(redirect_path, is_token) {
     const redirect = `${document.location.protocol}//${document.location.host}${redirect_path}`;
-    return `https://oauth.phone.com/?client_id=${
+    return `https://accounts.phone.com/?client_id=${
       this.options.client_id
       }&response_type=${is_token ? "token" : "code"}${this.options.scope.includes("openid") ? encodeURIComponent(" id_token") : ""}&scope=${encodeURIComponent(
       this.options.scope.join(" ")
