@@ -315,6 +315,10 @@ class PhoenixApiClient {
           this.options.session_name,
           JSON.stringify(user, null, 2)
         );
+        const max_timeout = 2147483647;
+        if (timeout > max_timeout) {
+          timeout = max_timeout;
+        }
         setTimeout(await this.handle_expired_session.bind(this), timeout);
       }
     }
