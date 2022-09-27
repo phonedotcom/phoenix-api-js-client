@@ -315,6 +315,10 @@ class PhoenixApiClient {
           this.options.session_name,
           JSON.stringify(user, null, 2)
         );
+        const max_timeout = 2147483647;
+        if (timeout > max_timeout) {
+          timeout = max_timeout;
+        }
         setTimeout(await this.handle_expired_session.bind(this), timeout);
       }
     }
@@ -337,7 +341,7 @@ class PhoenixApiClient {
    */
   _get_oauth_url(redirect_path, is_token) {
     const redirect = `${document.location.protocol}//${document.location.host}${redirect_path}`;
-    return `https://oauth.phone.com/?client_id=${
+    return `https://accounts.phone.com/?client_id=${
       this.options.client_id
       }&response_type=${is_token ? "token" : "code"}${this.options.scope.includes("openid") ? encodeURIComponent(" id_token") : ""}&scope=${encodeURIComponent(
       this.options.scope.join(" ")
