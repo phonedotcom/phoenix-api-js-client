@@ -15,6 +15,7 @@ class PhoenixApiClient {
     this.uses_token = false;
     this._id_token = null;
     this._decoded_id_token = null;
+    this.expiration_timeout = 0;
 
     this.options = {
       client_id: null,
@@ -300,6 +301,10 @@ class PhoenixApiClient {
     if (this.listeners["session-expired"]) this.listeners["session-expired"]();
   }
 
+  _session_expired() {
+    return this.expiration_timeout < 0;
+  }
+
   /**
    * Sets the user for the session, sets session expiration time
    * @param {object} user - object with user id, token and expiration time
@@ -307,8 +312,8 @@ class PhoenixApiClient {
   async set_user(user) {
     this.user = user;
     if (user["expiration"]) {
-      const timeout = user["expiration"] - Date.now() - 10000;
-      if (timeout < 0) {
+      this.expiration_timeout = user["expiration"] - Date.now() - 10000;
+      if (this._session_expired()) {
         await this.handle_expired_session();
       } else {
         this._setItem(
@@ -690,6 +695,9 @@ class PhoenixApiClient {
    * @return {Promise<*>}
    */
   async call_api(method, uri, body = null, is_uri_global = false, options = {}, token = '') {
+    if (this._session_expired()) {
+      return await this.handle_expired_session();
+    }
     const method_lc = method.toLowerCase();
     const url = this._phoenix_url(uri, is_uri_global);
     const headers = token.length ? this._phoenix_auth_headers(token) : this._phoenix_auth_headers();
@@ -698,9 +706,8 @@ class PhoenixApiClient {
       return await axios.get(url, options_a);
     } else if (method_lc === 'delete') {
       return await axios[method_lc](url, options_a); 
-    } else {
-      return await axios[method_lc](url, body || '', options_a);
     }
+    return await axios[method_lc](url, body || '', options_a);
   }
 
   /**
