@@ -302,7 +302,7 @@ class PhoenixApiClient {
   }
 
   _session_expired() {
-    return this.expiration_timeout < 0;
+    return (this.expiration_timeout - Date.now() - 10000) < 0;
   }
 
   /**
@@ -312,7 +312,7 @@ class PhoenixApiClient {
   async set_user(user) {
     this.user = user;
     if (user["expiration"]) {
-      this.expiration_timeout = user["expiration"] - Date.now() - 10000;
+      this.expiration_timeout = user["expiration"];
       if (this._session_expired()) {
         await this.handle_expired_session();
       } else {
@@ -695,19 +695,29 @@ class PhoenixApiClient {
    * @return {Promise<*>}
    */
   async call_api(method, uri, body = null, is_uri_global = false, options = {}, token = '') {
-    if (this._session_expired()) {
-      return await this.handle_expired_session();
+    try {
+      const method_lc = method.toLowerCase();
+      const url = this._phoenix_url(uri, is_uri_global);
+      const headers = token.length ? this._phoenix_auth_headers(token) : this._phoenix_auth_headers();
+      const options_a = {headers, ...options};
+      let promise;
+      if (method_lc === 'get') {
+        promise = await axios.get(url, options_a);
+      } else if (method_lc === 'delete') {
+        promise = await axios[method_lc](url, options_a); 
+      } else {
+        promise = await axios[method_lc](url, body || '', options_a);
+      }
+      return promise;
+    } catch (e) {
+      const err = e.response;
+      if (err.status === 401 && this._session_expired()) {
+        await this.handle_expired_session();
+        return null;
+      }
+
+      throw err;
     }
-    const method_lc = method.toLowerCase();
-    const url = this._phoenix_url(uri, is_uri_global);
-    const headers = token.length ? this._phoenix_auth_headers(token) : this._phoenix_auth_headers();
-    const options_a = {headers, ...options};
-    if (method_lc === 'get') {
-      return await axios.get(url, options_a);
-    } else if (method_lc === 'delete') {
-      return await axios[method_lc](url, options_a); 
-    }
-    return await axios[method_lc](url, body || '', options_a);
   }
 
   /**
