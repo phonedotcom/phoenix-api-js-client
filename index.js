@@ -269,6 +269,9 @@ class PhoenixApiClient {
       return item.data;
     } catch (e) {
       const err = e.response;
+      if (err.status === 401 && this._session_expired()) {
+        return null;
+      }
       if (err.status === 429 && this.options.handle_rate_limit) {
         return await this.handle_rate_limit(err, async () => {
           return await this.delete_access_token(_attempt);
@@ -712,7 +715,7 @@ class PhoenixApiClient {
     } catch (e) {
       const err = e.response;
       if (err.status === 401 && this._session_expired()) {
-        await this.handle_expired_session();
+        this.handle_expired_session(true);
         return null;
       }
 
