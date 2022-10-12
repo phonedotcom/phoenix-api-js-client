@@ -266,7 +266,7 @@ class PhoenixApiClient {
     try {
       if (this.uses_token) return true;
       const item = await this.call_api('delete', "/v4/oauth/access-token", null, true);
-      return item.data;
+      return item ? item.data : null;
     } catch (e) {
       const err = e.response;
       if (err.status === 401 && this._session_expired()) {
@@ -719,7 +719,7 @@ class PhoenixApiClient {
         return null;
       }
 
-      throw err;
+      throw e;
     }
   }
 
