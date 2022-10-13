@@ -15,6 +15,7 @@ class PhoenixApiClient {
     this.uses_token = false;
     this._id_token = null;
     this._decoded_id_token = null;
+    this.expiration_timeout = 0;
 
     this.options = {
       client_id: null,
@@ -264,10 +265,15 @@ class PhoenixApiClient {
   async delete_access_token(_attempt = 1) {
     try {
       if (this.uses_token) return true;
-      const item = await this.call_api('delete', "/v4/oauth/access-token", null, true);
+      const url = this._phoenix_url("/v4/oauth/access-token", true);
+      const headers = this._phoenix_auth_headers();
+      const item = await axios.delete(url, { headers }); 
       return item.data;
     } catch (e) {
       const err = e.response;
+      if (err.status === 401 && this._session_expired()) {
+        return null;
+      }
       if (err.status === 429 && this.options.handle_rate_limit) {
         return await this.handle_rate_limit(err, async () => {
           return await this.delete_access_token(_attempt);
@@ -301,14 +307,21 @@ class PhoenixApiClient {
   }
 
   /**
+   * Performs check if user expiration date is passed
+   */
+  _session_expired() {
+    return (this.expiration_timeout - Date.now() - 10000) < 0;
+  }
+
+  /**
    * Sets the user for the session, sets session expiration time
    * @param {object} user - object with user id, token and expiration time
    */
   async set_user(user) {
     this.user = user;
     if (user["expiration"]) {
-      const timeout = user["expiration"] - Date.now() - 10000;
-      if (timeout < 0) {
+      this.expiration_timeout = user["expiration"];
+      if (this._session_expired()) {
         await this.handle_expired_session();
       } else {
         this._setItem(
@@ -316,6 +329,7 @@ class PhoenixApiClient {
           JSON.stringify(user, null, 2)
         );
         const max_timeout = 2147483647;
+        const timeout = user["expiration"] - Date.now() - 10000;
         if (timeout > max_timeout) {
           timeout = max_timeout;
         }
@@ -690,16 +704,28 @@ class PhoenixApiClient {
    * @return {Promise<*>}
    */
   async call_api(method, uri, body = null, is_uri_global = false, options = {}, token = '') {
-    const method_lc = method.toLowerCase();
-    const url = this._phoenix_url(uri, is_uri_global);
-    const headers = token.length ? this._phoenix_auth_headers(token) : this._phoenix_auth_headers();
-    const options_a = {headers, ...options};
-    if (method_lc === 'get') {
-      return await axios.get(url, options_a);
-    } else if (method_lc === 'delete') {
-      return await axios[method_lc](url, options_a); 
-    } else {
-      return await axios[method_lc](url, body || '', options_a);
+    try {
+      const method_lc = method.toLowerCase();
+      const url = this._phoenix_url(uri, is_uri_global);
+      const headers = token.length ? this._phoenix_auth_headers(token) : this._phoenix_auth_headers();
+      const options_a = {headers, ...options};
+      if (method_lc === 'get') {
+        return await axios.get(url, options_a);
+      } else if (method_lc === 'delete') {
+        return await axios[method_lc](url, options_a); 
+      } else {
+        return await axios[method_lc](url, body || '', options_a);
+      }
+    } catch (e) {
+      const err = e.response;
+      if (err.status === 401 && this._session_expired()) {
+        await this.handle_expired_session();
+        return {
+          data: {}
+        };
+      }
+
+      throw e;
     }
   }
 
