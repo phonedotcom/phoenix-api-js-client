@@ -70,6 +70,7 @@ Session offers some listeners you can use:
 |logged-out|--|Triggered when user is logged out|
 |session-expired|--|Triggered when user is logged out after session expiration|
 |error|error object|Triggered when an error returned from the API|
+
 Usage example:
 ```javascript
     this.session.on('logged-out', () => listener_callback());
