@@ -272,7 +272,7 @@ class PhoenixApiClient {
       return item.data;
     } catch (e) {
       const err = e.response;
-      if (err.status === 401 && this._session_expired()) {
+      if (err.status === 401) {
         return null;
       }
       if (err.status === 429 && this.options.handle_rate_limit) {
