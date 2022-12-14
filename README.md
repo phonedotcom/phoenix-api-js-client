@@ -73,7 +73,7 @@ Session offers some listeners you can use:
 
 Usage example:
 ```javascript
-    this.session.on('logged-out', () => listener_callback());
+    this.session.on('logged-out', listener_callback);
 ````
 ### Client methods
 
