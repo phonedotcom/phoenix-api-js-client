@@ -33,6 +33,7 @@ class PhoenixApiClient {
     this.listeners = {
       "logged-out": null,
       "session-expired": null,
+      "error": null,
     };
   }
 
@@ -290,6 +291,8 @@ class PhoenixApiClient {
           return await this.delete_access_token(_attempt);
         });
       }
+      if (this.listeners["error"]) this.listeners["error"](err);
+
       throw err;
     }
   }
@@ -724,7 +727,7 @@ class PhoenixApiClient {
           data: {}
         };
       }
-
+      if (this.listeners["error"]) this.listeners["error"](err);
       throw e;
     }
   }
