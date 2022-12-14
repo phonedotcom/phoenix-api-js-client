@@ -1,4 +1,5 @@
 
+
 # JavaScript Client for api.phone.com.
 
 ## Description
@@ -62,6 +63,17 @@ phoenix_client.init_user().then(authorized => {
 - ***decode_id_token***: boolean, default: false; if openid scope is used, this option enabled will decode your id_token and validate its signature. As result it will return id_token's payload or null.
 - ***session_scope***: string, in: ['tab', 'browser'], default: 'tab'; defines how data is stored, 'tab' - uses sessionStorage (phoenix-api-js-client is available per tab), 'browser' - uses localStorage (phoenix-api-js-client data is shared across browser windows and tabs).
 
+### Listeners
+Session offers some listeners you can use:
+| listener | args | description |
+|--|--|--|
+|logged-out|--|Triggered when user is logged out|
+|session-expired|--|Triggered when user is logged out after session expiration|
+|error|error object|Triggered when an error returned from the API|
+Usage example:
+```javascript
+    this.session.on('logged-out', () => listener_callback());
+````
 ### Client methods
 
 Client object implements some methods you can use:
