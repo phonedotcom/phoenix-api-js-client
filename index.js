@@ -223,6 +223,7 @@ class PhoenixApiClient {
   async sign_out(session_expired = false) {
     try {
       if (this.options.id_token_sign_out && this.options.scope.includes('openid') && this.id_token) {
+        await this.delete_access_token();
         this.openid_endsession(session_expired);
       } else {
         await this.delete_access_token();
@@ -272,7 +273,7 @@ class PhoenixApiClient {
       return item.data;
     } catch (e) {
       const err = e.response;
-      if (err.status === 401 && this._session_expired()) {
+      if (err.status === 401) {
         return null;
       }
       if (err.status === 429 && this.options.handle_rate_limit) {
