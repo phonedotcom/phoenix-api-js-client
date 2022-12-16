@@ -223,6 +223,7 @@ class PhoenixApiClient {
   async sign_out(session_expired = false) {
     try {
       if (this.options.id_token_sign_out && this.options.scope.includes('openid') && this.id_token) {
+        await this.delete_access_token();
         this.openid_endsession(session_expired);
       } else {
         await this.delete_access_token();
