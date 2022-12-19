@@ -269,7 +269,7 @@ class PhoenixApiClient {
       if (this.uses_token) return true;
       const url = this._phoenix_url("/v4/oauth/access-token", true);
       const headers = this._phoenix_auth_headers();
-      const item = await axios.delete(url, { headers }); 
+      const item = await axios.delete(url, { headers });
       return item.data;
     } catch (e) {
       const err = e.response;
@@ -333,7 +333,7 @@ class PhoenixApiClient {
           JSON.stringify(user, null, 2)
         );
         const max_timeout = 2147483647;
-        const timeout = user["expiration"] - Date.now() - 10000;
+        let timeout = user["expiration"] - Date.now() - 10000;
         if (timeout > max_timeout) {
           timeout = max_timeout;
         }
@@ -359,11 +359,10 @@ class PhoenixApiClient {
    */
   _get_oauth_url(redirect_path, is_token) {
     const redirect = `${document.location.protocol}//${document.location.host}${redirect_path}`;
-    return `https://accounts.phone.com/?client_id=${
-      this.options.client_id
+    return `https://accounts.phone.com/?client_id=${this.options.client_id
       }&response_type=${is_token ? "token" : "code"}${this.options.scope.includes("openid") ? encodeURIComponent(" id_token") : ""}&scope=${encodeURIComponent(
-      this.options.scope.join(" ")
-    )}&redirect_uri=${encodeURIComponent(redirect)}${this.options.ignore_state ? '' : '&state='+this._state}`;
+        this.options.scope.join(" ")
+      )}&redirect_uri=${encodeURIComponent(redirect)}${this.options.ignore_state ? '' : '&state=' + this._state}`;
   }
 
   /**
@@ -388,7 +387,7 @@ class PhoenixApiClient {
   _phoenix_auth_headers(token = "") {
     const token_provided = token && token.length;
     return (this.user && this.user["token"]) || token_provided
-      ? {Authorization: token_provided ? token : this.user["token"]}
+      ? { Authorization: token_provided ? token : this.user["token"] }
       : {};
   }
 
@@ -712,11 +711,11 @@ class PhoenixApiClient {
       const method_lc = method.toLowerCase();
       const url = this._phoenix_url(uri, is_uri_global);
       const headers = token.length ? this._phoenix_auth_headers(token) : this._phoenix_auth_headers();
-      const options_a = {headers, ...options};
+      const options_a = { headers, ...options };
       if (method_lc === 'get') {
         return await axios.get(url, options_a);
       } else if (method_lc === 'delete') {
-        return await axios[method_lc](url, options_a); 
+        return await axios[method_lc](url, options_a);
       } else {
         return await axios[method_lc](url, body || '', options_a);
       }
@@ -758,7 +757,7 @@ class PhoenixApiClient {
     if (this.options.session_scope === 'tab') {
       return sessionStorage.getItem(key);
     }
-    return localStorage.getItem(key); 
+    return localStorage.getItem(key);
   }
 
   /**
