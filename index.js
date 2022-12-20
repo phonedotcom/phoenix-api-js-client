@@ -238,6 +238,8 @@ class PhoenixApiClient {
   * Cleans cache and calls logged-out callback if provided
   */
   post_sign_out(session_expired) {
+    this.id_token = null;
+    this.decoded_id_token = null;
     this.user = null;
     this._removeItem(this.options.session_name);
     if (this.listeners["logged-out"] && !session_expired)
@@ -250,8 +252,6 @@ class PhoenixApiClient {
   openid_endsession(session_expired) {
     const redirect = `${document.location.protocol}//${document.location.host}`;
     const uri = `https://oauth-api.phone.com/connect/endsession?id_token_hint=${encodeURIComponent(this.id_token)}&post_logout_redirect_uri=${encodeURIComponent(redirect)}`;
-    this.id_token = null;
-    this.decoded_id_token = null;
     this.post_sign_out(session_expired);
 
     window.location.assign(uri);
