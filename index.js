@@ -35,6 +35,7 @@ class PhoenixApiClient {
       "session-expired": null,
       "error": null,
     };
+    this.cache_keys = `${this.options.session_name}-cache-keys`;
   }
 
   set id_token(val) {
@@ -70,7 +71,7 @@ class PhoenixApiClient {
   }
 
   get id_token_cache_key() {
-    return `${this.options.session_name}-id-token-${this.user.id}`;
+    return `${this.options.session_name}-id-token`;
   }
 
   /**
@@ -241,6 +242,7 @@ class PhoenixApiClient {
     this.id_token = null;
     this.decoded_id_token = null;
     this.user = null;
+    this.reset_cache();
     this._removeItem(this.options.session_name);
     if (this.listeners["logged-out"] && !session_expired)
       this.listeners["logged-out"]();
@@ -733,16 +735,37 @@ class PhoenixApiClient {
   }
 
   /**
+   * Method for clearing all cache the package made
+   */
+  reset_cache() {
+    let cache = this._getItem(this.cache_keys);
+    if (cache) {
+      cache = JSON.parse(cache);
+      for (const c of cache) {
+        this._removeItem(c);
+      }
+    }
+
+    return true;
+  }
+
+  /**
    * Method for storing in session/local storage based on this.options.session_scope value
    * @param {string} key
    * @param {string} value
    * @return {boolean} true
    */
   _setItem(key, value) {
+    let keys = this._getItem(this.cache_keys);
+    keys = keys ? JSON.parse(keys) : [];
+    keys.push(key);
+    keys = [...new Set(keys)];
     if (this.options.session_scope === 'tab') {
       sessionStorage.setItem(key, value);
+      sessionStorage.setItem(this.cache_keys, JSON.stringify(keys));
     } else {
       localStorage.setItem(key, value);
+      localStorage.setItem(this.cache_keys, JSON.stringify(keys));
     }
 
     return true;
