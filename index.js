@@ -759,13 +759,13 @@ class PhoenixApiClient {
     let keys = this._getItem(this.cache_keys);
     keys = keys ? JSON.parse(keys) : [];
     keys.push(key);
-    keys = [...new Set(keys)];
+    keys = JSON.stringify([...new Set(keys)]);
     if (this.options.session_scope === 'tab') {
       sessionStorage.setItem(key, value);
-      sessionStorage.setItem(this.cache_keys, JSON.stringify(keys));
+      sessionStorage.setItem(this.cache_keys, keys);
     } else {
       localStorage.setItem(key, value);
-      localStorage.setItem(this.cache_keys, JSON.stringify(keys));
+      localStorage.setItem(this.cache_keys, keys);
     }
 
     return true;
