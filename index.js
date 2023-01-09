@@ -31,6 +31,7 @@ class PhoenixApiClient {
     if (!["tab", "browser"].includes(options.session_scope)) options.session_scope = "tab";
     Object.assign(this.options, options);
     this.listeners = {
+      "logging-out": null,
       "logged-out": null,
       "session-expired": null,
       "error": null,
@@ -222,6 +223,8 @@ class PhoenixApiClient {
    * Signs out the authenticated user
    */
   async sign_out(session_expired = false) {
+    if (this.listeners["logging-out"])
+      this.listeners["logging-out"]();
     try {
       if (this.options.id_token_sign_out && this.options.scope.includes('openid') && this.id_token) {
         await this.delete_access_token();
