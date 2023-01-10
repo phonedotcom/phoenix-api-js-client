@@ -31,10 +31,12 @@ class PhoenixApiClient {
     if (!["tab", "browser"].includes(options.session_scope)) options.session_scope = "tab";
     Object.assign(this.options, options);
     this.listeners = {
+      "logging-out": null,
       "logged-out": null,
       "session-expired": null,
       "error": null,
     };
+    this.cache_keys = `${this.options.session_name}-cache-keys`;
   }
 
   set id_token(val) {
@@ -70,7 +72,7 @@ class PhoenixApiClient {
   }
 
   get id_token_cache_key() {
-    return `${this.options.session_name}-id-token-${this.user.id}`;
+    return `${this.options.session_name}-id-token`;
   }
 
   /**
@@ -221,6 +223,8 @@ class PhoenixApiClient {
    * Signs out the authenticated user
    */
   async sign_out(session_expired = false) {
+    if (this.listeners["logging-out"])
+      this.listeners["logging-out"]();
     try {
       if (this.options.id_token_sign_out && this.options.scope.includes('openid') && this.id_token) {
         await this.delete_access_token();
@@ -241,6 +245,7 @@ class PhoenixApiClient {
     this.id_token = null;
     this.decoded_id_token = null;
     this.user = null;
+    this.reset_cache();
     this._removeItem(this.options.session_name);
     if (this.listeners["logged-out"] && !session_expired)
       this.listeners["logged-out"]();
@@ -733,16 +738,37 @@ class PhoenixApiClient {
   }
 
   /**
+   * Method for clearing all cache the package made
+   */
+  reset_cache() {
+    let cache = this._getItem(this.cache_keys);
+    if (cache) {
+      cache = JSON.parse(cache);
+      for (const c of cache) {
+        this._removeItem(c);
+      }
+    }
+
+    return true;
+  }
+
+  /**
    * Method for storing in session/local storage based on this.options.session_scope value
    * @param {string} key
    * @param {string} value
    * @return {boolean} true
    */
   _setItem(key, value) {
+    let keys = this._getItem(this.cache_keys);
+    keys = keys ? JSON.parse(keys) : [];
+    keys.push(key);
+    keys = JSON.stringify([...new Set(keys)]);
     if (this.options.session_scope === 'tab') {
       sessionStorage.setItem(key, value);
+      sessionStorage.setItem(this.cache_keys, keys);
     } else {
       localStorage.setItem(key, value);
+      localStorage.setItem(this.cache_keys, keys);
     }
 
     return true;
