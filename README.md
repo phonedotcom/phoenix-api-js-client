@@ -67,6 +67,7 @@ phoenix_client.init_user().then(authorized => {
 Session offers some listeners you can use:
 | listener | args | description |
 |--|--|--|
+|logging-out|--|Triggered on the begining of sing out process|
 |logged-out|--|Triggered when user is logged out|
 |session-expired|--|Triggered when user is logged out after session expiration|
 |error|error object|Triggered when an error returned from the API|
