@@ -1,4 +1,3 @@
-const axios = require("axios");
 const jwkToPem = require("jwk-to-pem");
 const jws = require("jws");
 
@@ -178,7 +177,7 @@ class PhoenixApiClient {
    * @return {Promise} result of resent request
    */
   handle_rate_limit(err, callback) {
-    const seconds = err.data["@error"]["@rateLimit"]["Retry-After"] || 1;
+    const seconds = err["@error"]["@rateLimit"]["Retry-After"] || 1;
     console.warn(`Too much requests. Retry after ${seconds}s`);
     return new Promise((resolve, reject) => {
       setTimeout(() => {
@@ -221,14 +220,13 @@ class PhoenixApiClient {
         `${window.location.pathname}${window.location.search}`
       );
       await this.set_user({
-        id: response.data["scope_details"][0]["voip_id"],
+        id: response["scope_details"][0]["voip_id"],
         token: token,
-        expiration: response.data["expires_at"]
-          ? response.data["expires_at"] * 1000
+        expiration: response["expires_at"]
+          ? response["expires_at"] * 1000
           : null,
       });
-    } catch (e) {
-      const err = e.response;
+    } catch (err) {
       if (err.status === 429 && this.options.handle_rate_limit) {
         await this.handle_rate_limit(err, async () => {
           await this._load_user(token, _attempt);
@@ -304,10 +302,8 @@ class PhoenixApiClient {
       if (this.uses_token) return true;
       const url = this._phoenix_url("/v4/oauth/access-token", true);
       const headers = this._phoenix_auth_headers();
-      const item = await axios.delete(url, { headers });
-      return item.data;
-    } catch (e) {
-      const err = e.response;
+      return await this.fetch_response(url, {method: "DELETE", headers});
+    } catch (err) {
       if (err.status === 401) {
         return null;
       }
@@ -470,13 +466,12 @@ class PhoenixApiClient {
       }
       const r = await this.call_api('get', global ? ('/v4' + uri) : uri, null, global);
       return {
-        items: r.data["items"],
-        offset: r.data["offset"],
-        total: r.data["total"],
-        limit: r.data["limit"],
+        items: r["items"],
+        offset: r["offset"],
+        total: r["total"],
+        limit: r["limit"],
       };
-    } catch (e) {
-      const err = e.response;
+    } catch (err) {
       if (err.status === 429 && this.options.handle_rate_limit) {
         return await this.handle_rate_limit(err, async () => {
           return await this.get_list(uri, limit, offset, global, _attempt);
@@ -506,9 +501,8 @@ class PhoenixApiClient {
   async get_item(uri, _attempt = 1) {
     try {
       const item = await this.call_api('get', uri);
-      return item.data;
-    } catch (e) {
-      const err = e.response;
+      return item;
+    } catch (err) {
       if (err.status === 429 && this.options.handle_rate_limit) {
         return await this.handle_rate_limit(err, async () => {
           return await this.get_item(uri, _attempt);
@@ -538,9 +532,8 @@ class PhoenixApiClient {
   async delete_item(uri, _attempt = 1) {
     try {
       const item = await this.call_api('delete', uri);
-      return item.data;
-    } catch (e) {
-      const err = e.response;
+      return item;
+    } catch (err) {
       if (err.status === 429 && this.options.handle_rate_limit) {
         return await this.handle_rate_limit(err, async () => {
           return await this.delete_item(uri, _attempt);
@@ -573,9 +566,8 @@ class PhoenixApiClient {
         responseType: "blob",
         timeout: 30000
       });
-      return item.data;
-    } catch (e) {
-      const err = e.response;
+      return item;
+    } catch (err) {
       if (err.status === 429 && this.options.handle_rate_limit) {
         return await this.handle_rate_limit(err, async () => {
           return await this.download_item(uri, _attempt);
@@ -606,9 +598,8 @@ class PhoenixApiClient {
   async replace_item(uri, data, _attempt = 1) {
     try {
       const item = await this.call_api('put', uri, data);
-      return item.data;
-    } catch (e) {
-      const err = e.response;
+      return item;
+    } catch (err) {
       if (err.status === 429 && this.options.handle_rate_limit) {
         return await this.handle_rate_limit(err, async () => {
           return await this.replace_item(uri, data, _attempt);
@@ -639,9 +630,8 @@ class PhoenixApiClient {
   async patch_item(uri, data, _attempt = 1) {
     try {
       const item = await this.call_api('patch', uri, data);
-      return item.data;
-    } catch (e) {
-      const err = e.response;
+      return item;
+    } catch (err) {
       if (err.status === 429 && this.options.handle_rate_limit) {
         return await this.handle_rate_limit(err, async () => {
           return await this.patch_item(uri, data, _attempt);
@@ -672,9 +662,8 @@ class PhoenixApiClient {
   async create_item(uri, data, _attempt = 1) {
     try {
       const item = await this.call_api('post', uri, data);
-      return item.data;
-    } catch (e) {
-      const err = e.response;
+      return item;
+    } catch (err) {
       if (err.status === 429 && this.options.handle_rate_limit) {
         return await this.handle_rate_limit(err, async () => {
           return await this.create_item(uri, data, _attempt);
@@ -709,8 +698,8 @@ class PhoenixApiClient {
       const header = JSON.parse(atob(tokenparts[0]));
       const payload = JSON.parse(atob(tokenparts[1]));
 
-      const configuration = await axios.get(`${payload.iss}/.well-known/openid-configuration/`);
-      const keys = await axios.get(configuration.data.keys);
+      const configuration = await this.fetch_response(`${payload.iss}/.well-known/openid-configuration/`);
+      const keys = await this.fetch_response(configuration.keys);
 
       const alg = header.alg;
       const key = keys.data.keys.find(x => x.alg === alg);
@@ -743,28 +732,38 @@ class PhoenixApiClient {
    */
   async call_api(method, uri, body = null, is_uri_global = false, options = {}, token = '') {
     try {
-      const method_lc = method.toLowerCase();
       const url = this._phoenix_url(uri, is_uri_global);
       const headers = token.length ? this._phoenix_auth_headers(token) : this._phoenix_auth_headers();
-      const options_a = { headers, ...options };
-      if (method_lc === 'get') {
-        return await axios.get(url, options_a);
-      } else if (method_lc === 'delete') {
-        return await axios[method_lc](url, options_a);
-      } else {
-        return await axios[method_lc](url, body || '', options_a);
+      const options_a = {
+        method: method.toUpperCase(),
+        headers,
+        ...options
+      };
+      if (body) {
+        options_a.body = JSON.stringify(body);
       }
-    } catch (e) {
-      const err = e.response;
+      return await this.fetch_response(url, options_a)
+    } catch (err) {
+      console.log(JSON.parse(JSON.stringify(err)));
       if (err.status === 401 && this._session_expired()) {
         await this.handle_expired_session();
-        return {
-          data: {}
-        };
+        return {};
       }
       if (this.listeners["error"]) this.listeners["error"](err);
-      throw e;
+      throw err;
     }
+  }
+
+  async fetch_response(url, options) {
+    const response = await fetch(url, options);
+      const json = await response.json();
+      if (response.ok) {
+        return json;
+      }
+      throw {
+        ...json,
+        status: response.status,
+      };
   }
 
   /**
