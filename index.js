@@ -26,11 +26,12 @@ class PhoenixApiClient {
       decode_id_token: false,
       ignore_state: false,
       session_scope: "tab",
-      stage: "production",
+      oauth_api_url: 'https://oauth-api.phone.com',
+      accounts_url: 'https://accounts.phone.com',
+      phoenix_url: 'https://api.phone.com',
     };
     if (!["tab", "browser"].includes(options.session_scope)) options.session_scope = "tab";
     Object.assign(this.options, options);
-    this.urls = PhoenixApiClient.generate_urls(this.options.stage);
     this.listeners = {
       "logging-out": null,
       "logged-out": null,
@@ -74,34 +75,6 @@ class PhoenixApiClient {
 
   get id_token_cache_key() {
     return `${this.options.session_name}-id-token`;
-  }
-
-  /**
-   * Generates urls for comunication with the API
-   * @return {Object}
-  */
-  static generate_urls(stage = 'production') {
-    let urls = {};
-    const all_urls = {
-      oauth: {
-        production: 'https://oauth-api.phone.com',
-        preproduction: 'https://oauth-api-pp.cit-phone.com', 
-      },
-      accounts: {
-        production: 'https://accounts.phone.com',
-        preproduction: 'https://accounts-pp.cit-phone.com',
-      },
-      phoenix: {
-        production: 'https://api.phone.com',
-        preproduction: 'https://api-pp.cit-phone.com',
-      }
-    };
-    const stage_prop = stage && stage === 'preproduction' ? 'preproduction' : 'production';
-    for (const key of Object.keys(all_urls)) {
-      urls[key] = all_urls[key][stage_prop];
-    }
-
-    return urls;
   }
 
   /**
@@ -284,7 +257,7 @@ class PhoenixApiClient {
    */
   openid_endsession(session_expired) {
     const redirect = `${document.location.protocol}//${document.location.host}`;
-    const uri = `${this.urls.oauth}/connect/endsession?id_token_hint=${encodeURIComponent(this.id_token)}&post_logout_redirect_uri=${encodeURIComponent(redirect)}`;
+    const uri = `${this.options.oauth_api_url}/connect/endsession?id_token_hint=${encodeURIComponent(this.id_token)}&post_logout_redirect_uri=${encodeURIComponent(redirect)}`;
     this.post_sign_out(session_expired);
 
     window.location.assign(uri);
@@ -390,7 +363,7 @@ class PhoenixApiClient {
    */
   _get_oauth_url(redirect_path, is_token) {
     const redirect = `${document.location.protocol}//${document.location.host}${redirect_path}`;
-    return `${this.urls.accounts}/?client_id=${this.options.client_id
+    return `${this.options.accounts_url}/?client_id=${this.options.client_id
       }&response_type=${is_token ? "token" : "code"}${this.options.scope.includes("openid") ? encodeURIComponent(" id_token") : ""}&scope=${encodeURIComponent(
         this.options.scope.join(" ")
       )}&redirect_uri=${encodeURIComponent(redirect)}${this.options.ignore_state ? '' : '&state=' + this._state}`;
@@ -403,7 +376,7 @@ class PhoenixApiClient {
    * @return {string} generated url
    */
   _phoenix_url(uri, global = false) {
-    let url = this.urls.phoenix;
+    let url = this.options.phoenix_url;
     if (!global) {
       url += `/v4/accounts/${this.user["id"]}`;
     }
