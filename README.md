@@ -62,6 +62,9 @@ phoenix_client.init_user().then(authorized => {
 - ***id_token_sign_out***: boolean, default: false; if openid scope is used, this option confirms that you want to use id_token for signing out.
 - ***decode_id_token***: boolean, default: false; if openid scope is used, this option enabled will decode your id_token and validate its signature. As result it will return id_token's payload or null.
 - ***session_scope***: string, in: ['tab', 'browser'], default: 'tab'; defines how data is stored, 'tab' - uses sessionStorage (phoenix-api-js-client is available per tab), 'browser' - uses localStorage (phoenix-api-js-client data is shared across browser windows and tabs).
+- ***phoenix_url***: string, default: 'https://api.phone.com'; can be setup to use custom stage url 
+- ***accounts_url***: string, default: 'https://accounts.phone.com'; can be setup to use custom url 
+- ***oauth_api_url***: string, default: 'https://oauth-api.phone.com'; can be setup to use custom url 
 
 ### Listeners
 Session offers some listeners you can use:

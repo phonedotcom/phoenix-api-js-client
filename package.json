@@ -22,7 +22,6 @@
   },
   "homepage": "https://github.com/phonedotcom/phoenix-api-js-client#readme",
   "dependencies": {
-    "axios": "^0.21.1",
     "jwk-to-pem": "^2.0.4",
     "jws": "^4.0.0"
   }
