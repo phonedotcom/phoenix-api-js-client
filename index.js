@@ -717,7 +717,6 @@ class PhoenixApiClient {
       }
       return await this.fetch_response(url, options_a)
     } catch (err) {
-      console.log(JSON.parse(JSON.stringify(err)));
       if (err.status === 401 && this._session_expired()) {
         await this.handle_expired_session();
         return {};
@@ -728,15 +727,20 @@ class PhoenixApiClient {
   }
 
   async fetch_response(url, options) {
+    let api_response;
     const response = await fetch(url, options);
-      const json = await response.json();
-      if (response.ok) {
-        return json;
-      }
-      throw {
-        ...json,
-        status: response.status,
-      };
+    if (options.responseType === 'blob') {
+      api_response = await response.blob();
+    } else {
+      api_response = await response.json();
+    }
+    if (response.ok) {
+      return api_response;
+    }
+    throw {
+      ...api_response,
+      status: response.status,
+    };
   }
 
   /**
