@@ -535,11 +535,9 @@ class PhoenixApiClient {
    */
   async download_item(uri, _attempt = 1) {
     try {
-      const item = await this.call_api('get', uri, null, false, {
-        responseType: "blob",
-        timeout: 30000
-      });
-      return item;
+      const item = await this.call_api('get', uri + (uri.includes('?') ? '' : '?get_temp_url=1'), null, false);
+      const response = await fetch(item.url);
+      return await response.blob();
     } catch (err) {
       if (err.status === 429 && this.options.handle_rate_limit) {
         return await this.handle_rate_limit(err, async () => {
