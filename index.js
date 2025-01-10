@@ -33,6 +33,8 @@ class PhoenixApiClient {
     if (!["tab", "browser"].includes(options.session_scope)) options.session_scope = "tab";
     Object.assign(this.options, options);
     this.listeners = {
+      "logging-in": null,
+      "logged-in": null,
       "logging-out": null,
       "logged-out": null,
       "session-expired": null,
@@ -82,10 +84,16 @@ class PhoenixApiClient {
    * @return {Promise<boolean>}
    */
   async init_user() {
+    if (this.listeners["logging-in"]) {
+      this.listeners["logging-in"]();
+    }
     let user = this._getItem(this.options.session_name);
     if (user) user = JSON.parse(user);
     if (!(user && (await this.set_user(user)))) {
       await this._oauth();
+    }
+    if (this.user && this.listeners["logged-in"]) {
+      this.listeners["logged-in"]();
     }
     return !!this.user;
   }
