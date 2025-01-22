@@ -204,7 +204,7 @@ class PhoenixApiClient {
     }
 
     const any_voip_id = scope_details.find((x) => x.voip_id)
-    if (any_voip_idnxt_user) {
+    if (any_voip_id) {
       return any_voip_id.voip_id
     }
 
