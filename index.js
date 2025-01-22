@@ -186,6 +186,31 @@ class PhoenixApiClient {
     });
   }
 
+  get_voip_id(data) {
+    if (!Array.isArray(data.scope_details)) {
+      throw new Error('scope_details property not available as array')
+    }
+
+    const { scope_details } = data
+
+    const account_owner = scope_details.find((x) => x.scope === 'account-owner' && x.voip_id)
+    if (account_owner) {
+      return account_owner.voip_id
+    }
+
+    const nxt_user = scope_details.find((x) => x.scope === 'nxt-user' && x.voip_id)
+    if (nxt_user) {
+      return nxt_user.voip_id
+    }
+
+    const any_voip_id = scope_details.find((x) => x.voip_id)
+    if (any_voip_id) {
+      return any_voip_id.voip_id
+    }
+
+    throw new Error('PhoenixApiJsClient not able to find user id')
+  }
+
   /**
    * Loads the user by the Bearer token, sets session expiration time
    * @param {string} token - Bearer token
@@ -194,18 +219,17 @@ class PhoenixApiClient {
   async _load_user(token, uses_token = false, _attempt = 1) {
     try {
       this.uses_token = uses_token;
-      const response = await this.call_api('get', "/v4/oauth/access-token", null, true, {}, token);
+      const response = await this.call_api('get', "/v4/oauth/access-token/details", null, true, {}, token);
       history.pushState(
         "",
         document.title,
         `${window.location.pathname}${window.location.search}`
       );
       await this.set_user({
-        id: response["scope_details"][0]["voip_id"],
+        id: this.get_voip_id(response),
         token: token,
-        expiration: response["expires_at"]
-          ? response["expires_at"] * 1000
-          : null,
+        expiration: response["expires_at"] ? response["expires_at"] * 1000 : null,
+        access_token_details: response
       });
     } catch (err) {
       if (err.status === 429 && this.options.handle_rate_limit) {
